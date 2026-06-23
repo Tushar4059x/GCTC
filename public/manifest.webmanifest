@@ -1,0 +1,17 @@
+{
+  "name": "Global Chamber of Trade and Commerce",
+  "short_name": "GCTC",
+  "description": "AI-guided cross-border B2B trade chamber for MSMEs.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f9fb",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

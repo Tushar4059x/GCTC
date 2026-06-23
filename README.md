@@ -1,0 +1,62 @@
+# GCTC MVP
+
+GCTC, the Global Chamber of Trade and Commerce, is a mobile-first PWA prototype for an Amazon-inspired B2B trade product. It demonstrates buyer marketplace pages, role-based demo login, seller center, admin console, product search, anonymised catalogue, product detail, trade cart, landed-cost checkout, logistics, tax/duty calculation, and upfront payment state.
+
+## What Is Built
+
+- Responsive React + TypeScript + Vite PWA.
+- Multi-page client routing for marketplace, product, cart, checkout, orders, seller center, admin console, account, and login.
+- Demo role switching for buyer, seller, and admin permission levels.
+- Amazon-style buyer flow: search, results, product detail, trade cart, checkout, and order tracking.
+- Seller center for inventory, fulfilment, settlement holds, and seller-side no-bypass rules.
+- Admin console for verification queue, identity vault controls, risk alerts, corridor/compliance operations, and platform margin controls.
+- Cross-border corridor search for West Africa-India, India-Singapore, India-UAE, and Vietnam-India.
+- Generic food/everyday-consumable catalogue with prices, specs, certifications, and benefits.
+- Supplier identity protection by design: buyer-facing data does not include supplier contact fields.
+- Dynamic invoice calculation for product/service, freight, movers, platform margin, duty, VAT, GST, and escrow.
+- Compliance checklist per corridor.
+- Payment state simulation for upfront payment and escrow-required corridors.
+
+## Demo Logins
+
+Use `Switch login` in the top right, then choose:
+
+- Buyer: `buyer@gctc.demo`
+- Seller: `seller@gctc.demo`
+- Admin: `admin@gctc.demo`
+
+The login is a frontend prototype only. Production auth should use server-side sessions, MFA for operators, role-based access control, and row-level security.
+
+## Run Locally
+
+```bash
+npm install
+npm run dev
+```
+
+## Prototype Image Sources
+
+Product photos are local prototype assets under `public/product-images`, sourced from Wikimedia Commons file pages:
+
+- Cashews: `File:Kashuvandi-001.jpg`
+- Cocoa: `File:Cocoa Powder and Chocolate on Marble Background.jpg`
+- Sesame: `File:Sesame-Seeds.jpg`
+- Turmeric: `File:Turmeric-powder.jpg`
+- Millet: `File:Millet grains.jpg`
+- Cardamom: `File:Cardamom Large.JPG`
+- Coffee: `File:Coffee beans robusta.jpg`
+- Packaging: `File:Eco-friendly cardboard packaging for takeaways.jpg`
+- Inspection: `File:Pre Trip Checklist (5161314421).jpg`
+
+## Best-Fit Production Stack
+
+- Frontend/PWA: Next.js or React Native Expo once native mobile distribution is required.
+- API: TypeScript service layer with tRPC or REST, deployed behind an API gateway.
+- Database: Postgres with row-level security, tenant-aware tables, encrypted fields for sensitive counterparty data.
+- Search: Postgres full-text for MVP, OpenSearch/Meilisearch once catalogue volume grows.
+- Payments: PCI-compliant provider such as Stripe/Razorpay/Adyen, with server-side signed payment intents and escrow/hold logic where supported.
+- Documents: Private object storage with short-lived signed URLs, malware scanning, audit trails, and immutable invoice snapshots.
+- Jobs/events: Queue workers for logistics quotes, compliance rules, FX refresh, invoice finalization, and reconciliation.
+- AI concierge: retrieval-backed assistant with strict tool permissions; it should call pricing/compliance APIs rather than inventing taxes or duties.
+
+See [ARCHITECTURE.md](/Users/tushar/Documents/Startups/GCTC/ARCHITECTURE.md) and [SECURITY.md](/Users/tushar/Documents/Startups/GCTC/SECURITY.md).
