@@ -34,6 +34,19 @@ npm install
 npm run dev
 ```
 
+## Deploy To Vercel
+
+This repo is configured for Vercel with `vercel.json`.
+
+- Framework preset: `Vite`
+- Install command: `npm ci`
+- Build command: `npm run build`
+- Output directory: `dist`
+- SPA deep links are rewritten to `index.html`, so routes like `/seller`, `/admin`, `/orders`, and `/checkout` work after refresh.
+- Baseline security headers are applied at the edge. Update the Content Security Policy before adding external APIs, analytics, payment providers, fonts, or image domains.
+
+To deploy from GitHub, import `Tushar4059x/GCTC` in Vercel and keep the root directory as the repository root.
+
 ## Prototype Image Sources
 
 Product photos are local prototype assets under `public/product-images`, sourced from Wikimedia Commons file pages:
