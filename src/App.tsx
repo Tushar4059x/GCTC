@@ -2,13 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import {
   calculateInvoice,
+  commonIndiaImportDocuments,
   corridors,
   formatMoney,
+  logisticsPartners,
+  productClassDocuments,
+  sellerSales,
   tradeItems,
   type Corridor,
   type DeliveryTier,
+  type FulfilmentOption,
   type InvoiceTotals,
   type PaymentStatus,
+  type PriceAuditEntry,
   type TradeItem,
 } from './data/trade'
 
@@ -40,8 +46,10 @@ interface Order {
 }
 
 interface PageProps {
+  catalogueItems: TradeItem[]
   corridor: Corridor
   freightTier: DeliveryTier
+  fulfilment: FulfilmentOption
   handleSearch: () => void
   invoice: InvoiceTotals
   lotCount: number
@@ -52,14 +60,25 @@ interface PageProps {
   selectItem: (item: TradeItem) => void
   selectedItem: TradeItem
   setFreightTier: (tier: DeliveryTier) => void
+  setFulfilment: (option: FulfilmentOption) => void
   setLotCount: (quantity: number) => void
   setMoverTier: (tier: DeliveryTier) => void
   setPaymentStatus: (status: PaymentStatus) => void
   setQuery: (value: string) => void
   submittedQuery: string
+  priceAudits: PriceAuditEntry[]
+  updateProductPrice: (itemId: string, newPrice: number, reason: string) => boolean
   user: DemoUser
   visibleItems: TradeItem[]
 }
+
+interface CatalogueStore {
+  version: 1
+  items: TradeItem[]
+  priceAudits: PriceAuditEntry[]
+}
+
+const catalogueStorageKey = 'gctc-catalogue-v1'
 
 const demoUsers: DemoUser[] = [
   {
@@ -84,6 +103,13 @@ const demoUsers: DemoUser[] = [
     organization: 'Global Chamber of Trade and Commerce',
   },
 ]
+
+const demoSessionKey = 'gctc-demo-session-v1'
+
+function loadDemoUser() {
+  const storedRole = window.sessionStorage.getItem(demoSessionKey)
+  return demoUsers.find((candidate) => candidate.role === storedRole) ?? demoUsers[0]
+}
 
 const routeTitles: Record<RouteId, string> = {
   marketplace: 'Marketplace',
@@ -129,6 +155,22 @@ const sampleOrders: Order[] = [
     protection: 'Platform hold',
   },
 ]
+
+function loadCatalogueStore(): CatalogueStore {
+  try {
+    const stored = window.localStorage.getItem(catalogueStorageKey)
+    if (!stored) return { version: 1, items: tradeItems, priceAudits: [] }
+    const parsed = JSON.parse(stored) as CatalogueStore
+    if (parsed.version !== 1 || !Array.isArray(parsed.items) || !Array.isArray(parsed.priceAudits)) {
+      return { version: 1, items: tradeItems, priceAudits: [] }
+    }
+    const storedById = new Map(parsed.items.map((item) => [item.id, item]))
+    const mergedItems = tradeItems.map((item) => ({ ...item, ...storedById.get(item.id) }))
+    return { version: 1, items: mergedItems, priceAudits: parsed.priceAudits }
+  } catch {
+    return { version: 1, items: tradeItems, priceAudits: [] }
+  }
+}
 
 const categoryTabs = ['All', 'Food & Spice', 'Dry fruits', 'Business support', 'Coffee', 'Services'] as const
 type CategoryTab = (typeof categoryTabs)[number]
@@ -190,7 +232,6 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { label: 'Discover', route: 'marketplace', activeRoutes: ['marketplace'] },
       { label: 'Admin console', route: 'admin', activeRoutes: ['admin'] },
-      { label: 'Seller center', route: 'seller', activeRoutes: ['seller'] },
       { label: 'Orders', route: 'orders', activeRoutes: ['orders'] },
       { label: 'Account', route: 'account', activeRoutes: ['account', 'login'] },
     ]
@@ -256,12 +297,14 @@ function routeFromPath(pathname: string): RouteId {
 
 function App() {
   const [route, setRoute] = useState<RouteId>(() => routeFromPath(window.location.pathname))
-  const [user, setUser] = useState<DemoUser>(demoUsers[0])
+  const [user, setUser] = useState<DemoUser>(loadDemoUser)
+  const [catalogueStore, setCatalogueStore] = useState<CatalogueStore>(loadCatalogueStore)
   const [query, setQuery] = useState('')
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [selectedItemId, setSelectedItemId] = useState('cashew-africa')
   const [freightTier, setFreightTier] = useState<DeliveryTier>('normal')
   const [moverTier, setMoverTier] = useState<DeliveryTier>('normal')
+  const [fulfilment, setFulfilment] = useState<FulfilmentOption>('turnkey')
   const [lotCount, setLotCount] = useState(1)
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('draft')
 
@@ -271,22 +314,26 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
+  useEffect(() => {
+    window.localStorage.setItem(catalogueStorageKey, JSON.stringify(catalogueStore))
+  }, [catalogueStore])
+
   const visibleItems = useMemo(() => {
-    const matches = tradeItems.filter((item) => itemMatchesQuery(item, submittedQuery))
-    return matches.length > 0 ? matches : tradeItems
-  }, [submittedQuery])
+    const matches = catalogueStore.items.filter((item) => itemMatchesQuery(item, submittedQuery))
+    return matches.length > 0 ? matches : catalogueStore.items
+  }, [catalogueStore.items, submittedQuery])
 
   const selectedItem = useMemo(
-    () => tradeItems.find((item) => item.id === selectedItemId) ?? visibleItems[0] ?? tradeItems[0],
-    [selectedItemId, visibleItems],
+    () => catalogueStore.items.find((item) => item.id === selectedItemId) ?? visibleItems[0] ?? catalogueStore.items[0],
+    [catalogueStore.items, selectedItemId, visibleItems],
   )
 
   const corridor = useMemo(() => getCorridor(selectedItem), [selectedItem])
 
   const invoice = useMemo(() => {
-    const baseInvoice = calculateInvoice(corridor, selectedItem, freightTier, moverTier)
+    const baseInvoice = calculateInvoice(corridor, selectedItem, freightTier, moverTier, fulfilment)
     return scaleInvoice(baseInvoice, lotCount)
-  }, [corridor, selectedItem, freightTier, moverTier, lotCount])
+  }, [corridor, selectedItem, freightTier, fulfilment, moverTier, lotCount])
 
   function navigate(nextRoute: RouteId) {
     setRoute(nextRoute)
@@ -303,7 +350,7 @@ function App() {
 
   function handleSearch() {
     const nextQuery = query.trim()
-    const matches = tradeItems.filter((item) => itemMatchesQuery(item, nextQuery))
+    const matches = catalogueStore.items.filter((item) => itemMatchesQuery(item, nextQuery))
     setSubmittedQuery(nextQuery)
     if (matches[0]) {
       const nextCorridor = getCorridor(matches[0])
@@ -314,13 +361,45 @@ function App() {
   }
 
   function loginAs(nextUser: DemoUser) {
+    window.sessionStorage.setItem(demoSessionKey, nextUser.role)
     setUser(nextUser)
     navigate(nextUser.role === 'seller' ? 'seller' : nextUser.role === 'admin' ? 'admin' : 'marketplace')
   }
 
+  function updateProductPrice(itemId: string, newPrice: number, reason: string) {
+    const ownedItem = catalogueStore.items.find((item) => item.id === itemId && item.sellerId === user.id)
+    if (user.role !== 'seller' || !ownedItem || !Number.isFinite(newPrice) || newPrice <= 0 || !reason.trim()) {
+      return false
+    }
+
+    const effectiveAt = new Date().toISOString()
+    const audit: PriceAuditEntry = {
+      id: `PRICE-${Date.now()}`,
+      sellerId: user.id,
+      itemId,
+      previousPrice: ownedItem.basePrice,
+      newPrice,
+      reason: reason.trim(),
+      effectiveAt,
+    }
+
+    setCatalogueStore((current) => ({
+      ...current,
+      items: current.items.map((item) => (
+        item.id === itemId
+          ? { ...item, basePrice: newPrice, priceUpdatedAt: effectiveAt.slice(0, 10) }
+          : item
+      )),
+      priceAudits: [audit, ...current.priceAudits].slice(0, 100),
+    }))
+    return true
+  }
+
   const pageProps = {
+    catalogueItems: catalogueStore.items,
     corridor,
     freightTier,
+    fulfilment,
     handleSearch,
     invoice,
     lotCount,
@@ -331,11 +410,14 @@ function App() {
     selectItem,
     selectedItem,
     setFreightTier,
+    setFulfilment,
     setLotCount,
     setMoverTier,
     setPaymentStatus,
     setQuery,
     submittedQuery,
+    priceAudits: catalogueStore.priceAudits,
+    updateProductPrice,
     user,
     visibleItems,
   }
@@ -708,7 +790,7 @@ function ProductPage(props: PageProps) {
           <div className="seller-privacy large">
             <Icon name="Shield" />
             <span>
-              Seller identity protected. GCTC reveals quality, origin, inspection, and price, but not direct seller contact.
+              Seller identity and underlying market-cost history are protected. The displayed amount is the current seller-authorised GCTC offer.
             </span>
           </div>
           <InfoColumns item={selectedItem} corridor={corridor} />
@@ -732,6 +814,8 @@ function InfoColumns({ corridor, item }: { corridor: Corridor; item: TradeItem }
         <strong>Trust</strong>
         <span>{corridor.trustScore}% corridor trust</span>
         <span>{corridor.protection}</span>
+        <span>Price updated {item.priceUpdatedAt}</span>
+        <span>Procurement: {item.procurementFrequency}</span>
       </div>
       <div>
         <strong>Certifications</strong>
@@ -752,11 +836,13 @@ function InfoColumns({ corridor, item }: { corridor: Corridor; item: TradeItem }
 function BuyBox({
   corridor,
   freightTier,
+  fulfilment,
   lotCount,
   moverTier,
   navigate,
   selectedItem,
   setFreightTier,
+  setFulfilment,
   setLotCount,
   setMoverTier,
   onContinue,
@@ -777,30 +863,81 @@ function BuyBox({
           onChange={(event) => setLotCount(Math.max(1, Number(event.target.value) || 1))}
         />
       </label>
-      <QuotePanel
-        title="Freight"
-        description="Delivery option"
-        selected={freightTier}
-        normal={calculateInvoice(corridor, selectedItem, 'normal', moverTier).freight}
-        urgent={calculateInvoice(corridor, selectedItem, 'urgent', moverTier).freight}
-        currency={corridor.currency}
-        onChange={setFreightTier}
-        testIdPrefix="freight"
-      />
-      <QuotePanel
-        title="Packing"
-        description="Handling option"
-        selected={moverTier}
-        normal={calculateInvoice(corridor, selectedItem, freightTier, 'normal').movers}
-        urgent={calculateInvoice(corridor, selectedItem, freightTier, 'urgent').movers}
-        currency={corridor.currency}
-        onChange={setMoverTier}
-        testIdPrefix="movers"
-      />
+      <FulfilmentSelector selected={fulfilment} onChange={setFulfilment} />
+      {fulfilment === 'turnkey' ? (
+        <>
+          <QuotePanel
+            title="Freight"
+            description="Delivery option"
+            selected={freightTier}
+            normal={calculateInvoice(corridor, selectedItem, 'normal', moverTier, fulfilment).freight}
+            urgent={calculateInvoice(corridor, selectedItem, 'urgent', moverTier, fulfilment).freight}
+            currency={corridor.currency}
+            onChange={setFreightTier}
+            testIdPrefix="freight"
+          />
+          <QuotePanel
+            title="Packing"
+            description="Handling option"
+            selected={moverTier}
+            normal={calculateInvoice(corridor, selectedItem, freightTier, 'normal', fulfilment).movers}
+            urgent={calculateInvoice(corridor, selectedItem, freightTier, 'urgent', fulfilment).movers}
+            currency={corridor.currency}
+            onChange={setMoverTier}
+            testIdPrefix="movers"
+          />
+        </>
+      ) : (
+        <div className="buyer-responsibility">
+          <Icon name="Document" />
+          <span>Buyer arranges freight, receiving-port clearance, insurance, and inland delivery.</span>
+        </div>
+      )}
       <button type="button" onClick={onContinue ?? (() => navigate('cart'))}>
         Add to trade cart
       </button>
     </aside>
+  )
+}
+
+function FulfilmentSelector({
+  selected,
+  onChange,
+}: {
+  selected: FulfilmentOption
+  onChange: (option: FulfilmentOption) => void
+}) {
+  const options: Array<{ id: FulfilmentOption; title: string; description: string }> = [
+    {
+      id: 'sourcing-only',
+      title: 'Option 1 · GCTC sourcing',
+      description: 'Product sourcing at the agreed quality, quantity, price, and frequency. Buyer manages shipment and destination clearance.',
+    },
+    {
+      id: 'turnkey',
+      title: 'Option 2 · GCTC turnkey',
+      description: 'Product, freight, insurance, clearance support, handling, and shipment coordination under one GCTC package.',
+    },
+  ]
+
+  return (
+    <div className="fulfilment-selector" role="radiogroup" aria-label="Fulfilment option">
+      <span>Choose service scope</span>
+      {options.map((option) => (
+        <button
+          aria-checked={selected === option.id}
+          className={selected === option.id ? 'selected' : ''}
+          data-testid={`fulfilment-${option.id}`}
+          key={option.id}
+          role="radio"
+          type="button"
+          onClick={() => onChange(option.id)}
+        >
+          <strong>{option.title}</strong>
+          <span>{option.description}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -854,7 +991,7 @@ function QuotePanel({
 }
 
 function CartPage(props: PageProps) {
-  const { corridor, invoice, lotCount, navigate, selectedItem } = props
+  const { corridor, fulfilment, invoice, lotCount, navigate, selectedItem } = props
   return (
     <section className="content-grid">
       <article className="panel cart-panel">
@@ -870,11 +1007,12 @@ function CartPage(props: PageProps) {
           <div>
             <strong>{selectedItem.name}</strong>
             <span>{lotCount} lot · {selectedItem.unit}</span>
+            <span>{fulfilment === 'turnkey' ? 'GCTC turnkey fulfilment' : 'GCTC sourcing only · buyer-managed logistics'}</span>
             <span>Seller identity protected by GCTC</span>
           </div>
           <strong>{formatMoney(invoice.subtotal, corridor.currency)}</strong>
         </div>
-        <DocumentChecklist corridor={corridor} />
+        <DocumentChecklist corridor={corridor} item={selectedItem} />
       </article>
       <InvoicePanel {...props} primaryAction="Proceed to checkout" onPrimary={() => navigate('checkout')} />
     </section>
@@ -882,14 +1020,16 @@ function CartPage(props: PageProps) {
 }
 
 function CheckoutPage(props: PageProps) {
-  const { corridor, paymentStatus, setPaymentStatus } = props
+  const { corridor, fulfilment, paymentStatus, selectedItem, setPaymentStatus } = props
   return (
     <section className="content-grid">
       <article className="panel checkout-panel">
         <span>Checkout</span>
         <h2>Pay GCTC upfront</h2>
         <p>
-          This checkout simulates a payment intent. In production, the server signs final invoice totals before sending the buyer to a PCI-compliant provider.
+          {fulfilment === 'turnkey'
+            ? 'GCTC coordinates the product, freight, insurance, clearance support, and inland handling under one package.'
+            : 'GCTC secures the product order. Your team remains responsible for shipment, receiving-port clearance, insurance, and inland delivery.'}
         </p>
         <div className="checkout-steps">
           <span className="active">Address locked</span>
@@ -897,7 +1037,7 @@ function CheckoutPage(props: PageProps) {
           <span className={paymentStatus === 'secured' ? 'active' : ''}>Payment secured</span>
           <span>Supplier settlement</span>
         </div>
-        <DocumentChecklist corridor={corridor} />
+        <DocumentChecklist corridor={corridor} item={selectedItem} />
       </article>
       <InvoicePanel {...props} primaryAction="Buy through GCTC" onPrimary={() => setPaymentStatus('secured')} />
     </section>
@@ -906,6 +1046,7 @@ function CheckoutPage(props: PageProps) {
 
 function InvoicePanel({
   corridor,
+  fulfilment,
   invoice,
   lotCount,
   paymentStatus,
@@ -914,10 +1055,13 @@ function InvoicePanel({
   selectedItem,
 }: PageProps & { primaryAction?: string; onPrimary?: () => void }) {
   const rows = [
-    [`Product/service x ${lotCount}`, invoice.subtotal],
+    [`Seller-authorised offer x ${lotCount}`, invoice.subtotal],
     ['Freight', invoice.freight],
     ['Packing/handling', invoice.movers],
+    ['Insurance', invoice.insurance],
+    ['Clearance support', invoice.clearanceSupport],
     ['GCTC margin', invoice.platformMargin],
+    ['Turnkey service charge', invoice.turnkeyServiceCharge],
     ['Customs duty', invoice.duty],
     ['VAT/import levy', invoice.vat],
     ['GST', invoice.gst],
@@ -930,6 +1074,7 @@ function InvoicePanel({
         <span>Checkout summary</span>
         <strong>{selectedItem.name}</strong>
         <p>{corridor.from} to {corridor.to}</p>
+        <small>{fulfilment === 'turnkey' ? 'Option 2 · GCTC turnkey package' : 'Option 1 · GCTC sourcing only'}</small>
       </div>
       <div className="invoice-rows">
         {rows.map(([label, value]) => (
@@ -940,7 +1085,7 @@ function InvoicePanel({
         ))}
       </div>
       <div className="invoice-total" data-testid="invoice-total">
-        <span>Final landed amount</span>
+        <span>{fulfilment === 'turnkey' ? 'Final landed amount' : 'GCTC payable amount'}</span>
         <strong>{formatMoney(invoice.total, corridor.currency)}</strong>
       </div>
       <div className={`payment-state ${paymentStatus}`}>
@@ -960,10 +1105,16 @@ function InvoicePanel({
   )
 }
 
-function DocumentChecklist({ corridor }: { corridor: Corridor }) {
+function DocumentChecklist({ corridor, item }: { corridor: Corridor; item: TradeItem }) {
+  const documents = Array.from(new Set([
+    ...(corridor.to.toLowerCase().includes('india') ? commonIndiaImportDocuments : []),
+    ...corridor.compliance,
+    ...productClassDocuments[item.productClass],
+  ]))
+
   return (
     <div className="document-list">
-      {corridor.compliance.map((document) => (
+      {documents.map((document) => (
         <span key={document}>
           <Icon name="Document" />
           {document}
@@ -973,7 +1124,7 @@ function DocumentChecklist({ corridor }: { corridor: Corridor }) {
   )
 }
 
-function OrdersPage({ paymentStatus, user }: PageProps) {
+function OrdersPage({ catalogueItems, paymentStatus, user }: PageProps) {
   const tracking = ['Payment received', 'Supplier confirmed', 'Packed', 'Export docs', 'Customs', 'Delivered']
   const activeIndex = paymentStatus === 'secured' ? 1 : 0
   return (
@@ -987,7 +1138,7 @@ function OrdersPage({ paymentStatus, user }: PageProps) {
       </div>
       <div className="order-grid">
         {sampleOrders.map((order) => {
-          const item = tradeItems.find((tradeItem) => tradeItem.id === order.itemId) ?? tradeItems[0]
+          const item = catalogueItems.find((tradeItem) => tradeItem.id === order.itemId) ?? catalogueItems[0]
           return (
             <article className="order-card" key={order.id}>
               <img src={item.imageUrl} alt={item.name} />
@@ -1013,31 +1164,76 @@ function OrdersPage({ paymentStatus, user }: PageProps) {
   )
 }
 
-function SellerPage({ user }: PageProps) {
-  if (user.role !== 'seller' && user.role !== 'admin') return <AccessDenied needed="seller or admin" />
+function SellerPage({ catalogueItems, priceAudits, updateProductPrice, user }: PageProps) {
+  if (user.role !== 'seller') return <AccessDenied needed="seller" />
+  const ownedItems = catalogueItems.filter((item) => item.sellerId === user.id)
+  const sales = sellerSales.filter((sale) => sale.sellerId === user.id)
+  const grossSales = sales.reduce((total, sale) => total + sale.amount, 0)
+  const acceptedSales = sales.filter((sale) => sale.qualityStatus === 'passed').length
+  const qualityRate = sales.length > 0 ? Math.round((acceptedSales / sales.length) * 100) : 100
+  const ownedAudits = priceAudits.filter((audit) => audit.sellerId === user.id)
+
   return (
     <section className="dashboard-grid">
-      <MetricCard label="Active listings" value="9" detail="Buyer-facing seller identity masked" />
-      <MetricCard label="Open orders" value="14" detail="7 pending docs, 3 pending dispatch" />
-      <MetricCard label="Settlement hold" value="₹18.4L" detail="Released after GCTC fulfilment checks" />
+      <MetricCard label="My active listings" value={String(ownedItems.length)} detail="Only your products are editable" />
+      <MetricCard label="Recorded sales" value={formatMoney(grossSales)} detail={`${sales.length} completed sales in this report`} />
+      <MetricCard label="Quality acceptance" value={`${qualityRate}%`} detail="Exceptions are reviewed by GCTC operations" />
       <article className="panel wide-panel">
         <div className="section-heading">
           <div>
             <span>Seller center</span>
-            <h2>Inventory and fulfilment</h2>
+            <h2>My products and pricing</h2>
           </div>
-          <p>Sellers manage stock and documents, but buyers still transact through GCTC.</p>
+          <p>Change only your current GCTC offer. Every update is timestamped and auditable.</p>
         </div>
-        <div className="table-list">
-          {tradeItems.slice(0, 6).map((item) => (
-            <div key={item.id}>
-              <img src={item.imageUrl} alt={item.name} />
-              <span>{item.name}</span>
-              <span>{item.availableQty}</span>
-              <strong>GCTC masked listing</strong>
-            </div>
+        <div className="seller-listings">
+          {ownedItems.map((item) => (
+            <SellerListingRow item={item} key={item.id} updateProductPrice={updateProductPrice} />
           ))}
         </div>
+      </article>
+      <article className="panel wide-panel">
+        <div className="section-heading">
+          <div>
+            <span>Backend report</span>
+            <h2>Sales and quality record</h2>
+          </div>
+          <button className="outline-button" type="button" onClick={() => exportSalesReport(sales, catalogueItems)}>
+            Export CSV
+          </button>
+        </div>
+        <div className="report-table" role="table" aria-label="Seller sales report">
+          <div className="report-row report-head" role="row">
+            <span>Sale</span><span>Product</span><span>Quantity</span><span>Value</span><span>Quality</span>
+          </div>
+          {sales.map((sale) => {
+            const item = catalogueItems.find((candidate) => candidate.id === sale.itemId)
+            return (
+              <div className="report-row" role="row" key={sale.id}>
+                <span><strong>{sale.id}</strong><small>{sale.soldAt}</small></span>
+                <span>{item?.name ?? sale.itemId}</span>
+                <span>{sale.quantityTons} tons · {sale.lots} lots</span>
+                <span>{formatMoney(sale.amount)}</span>
+                <span className={`status-label ${sale.qualityStatus}`}>{sale.qualityStatus}</span>
+              </div>
+            )
+          })}
+        </div>
+      </article>
+      <article className="panel">
+        <span>Price audit</span>
+        <h2>Recent changes</h2>
+        {ownedAudits.length > 0 ? (
+          <div className="audit-list">
+            {ownedAudits.slice(0, 4).map((audit) => (
+              <div key={audit.id}>
+                <strong>{formatMoney(audit.previousPrice)} → {formatMoney(audit.newPrice)}</strong>
+                <span>{audit.reason}</span>
+                <small>{new Date(audit.effectiveAt).toLocaleString('en-IN')}</small>
+              </div>
+            ))}
+          </div>
+        ) : <p>No price changes recorded in this browser.</p>}
       </article>
       <article className="panel">
         <span>Seller rules</span>
@@ -1048,35 +1244,154 @@ function SellerPage({ user }: PageProps) {
   )
 }
 
-function AdminPage({ user }: PageProps) {
+function SellerListingRow({
+  item,
+  updateProductPrice,
+}: {
+  item: TradeItem
+  updateProductPrice: (itemId: string, newPrice: number, reason: string) => boolean
+}) {
+  const [price, setPrice] = useState(String(item.basePrice))
+  const [reason, setReason] = useState('')
+  const [message, setMessage] = useState('')
+
+  function savePrice() {
+    const updated = updateProductPrice(item.id, Number(price), reason)
+    setMessage(updated ? 'Price updated and audit entry created.' : 'Enter a valid price and a reason.')
+    if (updated) setReason('')
+  }
+
+  return (
+    <form
+      className="seller-listing-row"
+      onSubmit={(event) => {
+        event.preventDefault()
+        savePrice()
+      }}
+    >
+      <img src={item.imageUrl} alt={item.name} />
+      <div className="listing-identity">
+        <strong>{item.name}</strong>
+        <span>{item.availableQty} · {item.procurementFrequency}</span>
+        <small>Last effective {item.priceUpdatedAt}</small>
+      </div>
+      <label>
+        <span>Offer price (INR)</span>
+        <input
+          aria-label={`Offer price for ${item.name}`}
+          min="1"
+          step="100"
+          type="number"
+          value={price}
+          onChange={(event) => setPrice(event.target.value)}
+        />
+      </label>
+      <label>
+        <span>Reason for change</span>
+        <input
+          aria-label={`Price change reason for ${item.name}`}
+          maxLength={120}
+          placeholder="Supply or market adjustment"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+      <button data-testid={`update-price-${item.id}`} type="button" onClick={savePrice}>Update price</button>
+      <small className="form-message" aria-live="polite">{message}</small>
+    </form>
+  )
+}
+
+function exportSalesReport(sales: typeof sellerSales, items: TradeItem[]) {
+  const headers = ['Sale ID', 'Date', 'Buyer reference', 'Product', 'Lots', 'Quantity tons', 'Value INR', 'Fulfilment', 'Quality', 'Disputes']
+  const itemNames = new Map(items.map((item) => [item.id, item.name]))
+  const rows = sales.map((sale) => [
+    sale.id,
+    sale.soldAt,
+    sale.buyerAlias,
+    itemNames.get(sale.itemId) ?? sale.itemId,
+    sale.lots,
+    sale.quantityTons,
+    sale.amount,
+    sale.fulfilment,
+    sale.qualityStatus,
+    sale.disputeCount,
+  ])
+  const escapeCell = (value: string | number) => {
+    const text = String(value)
+    const spreadsheetSafe = /^[=+\-@]/.test(text) ? `'${text}` : text
+    return `"${spreadsheetSafe.replaceAll('"', '""')}"`
+  }
+  const csv = [headers, ...rows].map((row) => row.map(escapeCell).join(',')).join('\n')
+  const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `gctc-seller-sales-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(href)
+}
+
+function AdminPage({ catalogueItems, user }: PageProps) {
   if (user.role !== 'admin') return <AccessDenied needed="admin" />
+  const reviewSales = sellerSales.filter((sale) => sale.qualityStatus !== 'passed' || sale.disputeCount > 0)
+
   return (
     <section className="dashboard-grid">
       <MetricCard label="GMV pipeline" value="₹2.8Cr" detail="Across 4 demo corridors" />
-      <MetricCard label="Verification queue" value="23" detail="Suppliers, docs, quality checks" />
-      <MetricCard label="Risk alerts" value="6" detail="Escrow or enhanced document review" />
+      <MetricCard label="Seller quality review" value={String(reviewSales.length)} detail="Sales with quality or dispute exceptions" />
+      <MetricCard label="Logistics partners" value={String(logisticsPartners.length)} detail="Private operator directory and tariffs" />
       <article className="panel wide-panel">
         <div className="section-heading">
           <div>
-            <span>Admin console</span>
-            <h2>Identity vault and platform controls</h2>
+            <span>Private operations</span>
+            <h2>Logistics partner and tariff desk</h2>
           </div>
-          <p>Only admin operations can see internal supplier identity references.</p>
+          <p>Buyer screens expose GCTC support and quoted costs only, never contractor identity.</p>
         </div>
-        <div className="table-list admin-table">
-          {['Supplier legal entity encrypted', 'KYB review pending', 'Payout hold approved', 'Customs rule pack updated'].map((row, index) => (
-            <div key={row}>
-              <span>CTRL-{index + 104}</span>
-              <span>{row}</span>
-              <strong>{index % 2 === 0 ? 'Needs review' : 'Approved'}</strong>
+        <div className="logistics-table">
+          {logisticsPartners.map((partner) => (
+            <div key={partner.id}>
+              <span><strong>{partner.type}</strong><small>{partner.id}</small></span>
+              <span><strong>{partner.legalName}</strong><small>{partner.corridor}</small></span>
+              <span><strong>{formatMoney(partner.baseRatePerTon)} / ton</strong><small>{partner.distanceRatePerTonKm > 0 ? `${formatMoney(partner.distanceRatePerTonKm)} / ton-km` : 'Fixed storage tariff'}</small></span>
+              <span><strong>{partner.capacity}</strong><small>Audited {partner.lastAudit}</small></span>
+              <span className={partner.status === 'Verified' ? 'status-label passed' : 'status-label review'}>{partner.status}</span>
+            </div>
+          ))}
+        </div>
+      </article>
+      <article className="panel wide-panel">
+        <div className="section-heading">
+          <div>
+            <span>Quality control</span>
+            <h2>Seller sales exceptions</h2>
+          </div>
+          <p>Review product performance without disclosing buyer contact details to sellers.</p>
+        </div>
+        <div className="report-table">
+          <div className="report-row report-head">
+            <span>Sale</span><span>Seller</span><span>Product</span><span>Disputes</span><span>State</span>
+          </div>
+          {reviewSales.map((sale) => (
+            <div className="report-row" key={sale.id}>
+              <span><strong>{sale.id}</strong><small>{sale.soldAt}</small></span>
+              <span>{sale.sellerId}</span>
+              <span>{catalogueItems.find((item) => item.id === sale.itemId)?.name ?? sale.itemId}</span>
+              <span>{sale.disputeCount}</span>
+              <span className={`status-label ${sale.qualityStatus}`}>{sale.qualityStatus}</span>
             </div>
           ))}
         </div>
       </article>
       <article className="panel">
-        <span>Platform revenue</span>
-        <h2>Margin controls</h2>
-        <p>Admin can tune platform margin, escrow requirements, corridor trust scores, and compliance rule packs before invoices are issued.</p>
+        <span>India import controls</span>
+        <h2>Core document pack</h2>
+        <p>{commonIndiaImportDocuments.join(' · ')}</p>
+      </article>
+      <article className="panel">
+        <span>Category approvals</span>
+        <h2>Conditional documents</h2>
+        <p>Food: FSSAI · Marine: EIA and health certificate · Plant: phytosanitary · Animal: veterinary certification.</p>
       </article>
     </section>
   )
