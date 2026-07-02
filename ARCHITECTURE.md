@@ -2,15 +2,15 @@
 
 ## MVP Shape
 
-This repository starts as a React + TypeScript PWA because it gives the fastest path to a working responsive web and mobile-like surface. The domain model is split into typed corridor, catalogue, compliance, logistics, and invoice data so each can become an API-backed module without changing the product workflow.
+This repository starts as a React + TypeScript PWA because it gives the fastest path to a working responsive web and mobile-like surface. The current product scope is physical goods sourced across Indian states. The domain model is split into typed sourcing routes, catalogue, compliance, logistics, and invoice data so each can become an API-backed module without changing the product workflow.
 
 ## Production Services
 
 1. Identity and access: buyer, supplier, operator, compliance reviewer, and finance roles with MFA for operators.
-2. Catalogue service: anonymised buyer view, private supplier view, verification state, certifications, product lots, and service scopes.
-3. Corridor intelligence service: trade scores, compliance rules, allowed categories, authority references, duty/VAT/GST rates, and risk controls.
-4. Quote service: freight, packers/movers, insurance, SLA, normal/urgent tiers, and quote expiry.
-5. Invoice service: immutable priced snapshot with taxes, duties, platform margin, and escrow rules.
+2. Catalogue service: anonymised buyer view, private supplier view, verification state, certifications, state origin, and physical product lots.
+3. State sourcing service: route scores, GST/e-way-bill rules, allowed categories, authority references, and risk controls.
+4. Quote service: interstate transport, packing/handling, transit insurance, SLA, normal/urgent tiers, and quote expiry.
+5. Invoice service: immutable priced snapshot with GST, platform margin, logistics costs, and payment-protection rules.
 6. Payment service: provider payment intent, reconciliation, refunds, settlement, and escrow release workflow.
 7. Document service: private trade document storage, scanning, versioning, watermarking, and signed access.
 8. AI concierge service: controlled assistant that orchestrates the services above and never receives private supplier contact data unless the user role permits it.
@@ -42,13 +42,13 @@ Every write must derive the actor and tenant from the server session. Never acce
 
 ## Fulfilment Options
 
-- `sourcing-only`: GCTC sources the agreed product, quality, quantity, and procurement frequency. Freight, receiving-port clearance, insurance, and inland delivery are buyer responsibilities.
-- `turnkey`: GCTC adds freight, insurance, clearance support, packing/handling, approved logistics tariffs, and a service charge.
+- `sourcing-only`: GCTC sources the agreed product, quality, quantity, and procurement frequency. Pickup, interstate transport, insurance, and final delivery are buyer responsibilities.
+- `turnkey`: GCTC adds interstate transport, transit insurance, delivery coordination, packing/handling, approved logistics tariffs, and a service charge.
 - The quote service returns an expiring, signed snapshot. Checkout accepts the quote ID, never client-calculated totals.
 
-## India Import Rule Pack
+## India Trade Rule Pack
 
-The common pack includes purchase order, commercial invoice, packing list, bill of lading, certificate of origin, test/inspection reports, and insurance certificate. Category rules add FSSAI for food, EIA and health certification for marine products, phytosanitary clearance for plant products, and veterinary/health certification for animal products.
+The common pack includes purchase order, GST tax invoice, packing list, e-way bill where applicable, quality/test reports, and transit insurance for GCTC delivery. Product rules add FSSAI verification and batch or commodity quality reports.
 
 ## Data Boundaries
 

@@ -1,8 +1,16 @@
-export type CorridorId = 'west-africa-india' | 'india-singapore' | 'india-uae' | 'vietnam-india'
+export type CorridorId =
+  | 'maharashtra-india'
+  | 'andhra-pradesh-india'
+  | 'gujarat-india'
+  | 'telangana-india'
+  | 'rajasthan-india'
+  | 'kerala-india'
+  | 'karnataka-india'
+
 export type DeliveryTier = 'normal' | 'urgent'
 export type PaymentStatus = 'draft' | 'escrow-required' | 'ready' | 'secured'
 export type FulfilmentOption = 'sourcing-only' | 'turnkey'
-export type ProductClass = 'food' | 'marine' | 'plant' | 'animal' | 'service'
+export type ProductClass = 'food' | 'plant'
 export type QualityStatus = 'passed' | 'review' | 'rejected'
 
 export interface Corridor {
@@ -11,13 +19,10 @@ export interface Corridor {
   to: string
   searchTerms: string[]
   currency: string
-  fxToInr: number
   trustScore: number
   dataReliability: number
   legalClarity: number
   transactionSecurity: number
-  dutyRate: number
-  vatRate: number
   gstRate: number
   compliance: string[]
   authority: string
@@ -28,10 +33,11 @@ export interface TradeItem {
   id: string
   sellerId: string
   corridorId: CorridorId
-  kind: 'product' | 'service'
+  kind: 'product'
   productClass: ProductClass
   name: string
   category: string
+  state: string
   origin: string
   imageUrl: string
   unit: string
@@ -59,8 +65,6 @@ export interface InvoiceTotals {
   platformMargin: number
   turnkeyServiceCharge: number
   gst: number
-  duty: number
-  vat: number
   escrowFee: number
   total: number
 }
@@ -103,331 +107,297 @@ export interface PriceAuditEntry {
 
 export const corridors: Corridor[] = [
   {
-    id: 'west-africa-india',
-    from: 'West Africa supplier network',
-    to: 'Mumbai, India',
-    searchTerms: ['africa', 'ghana', 'tanzania', 'ivory coast', 'cashews', 'cocoa', 'dry fruits', 'mumbai'],
+    id: 'maharashtra-india',
+    from: 'Ratnagiri, Maharashtra',
+    to: 'Pan-India delivery',
+    searchTerms: ['maharashtra', 'ratnagiri', 'mumbai', 'cashew', 'dry fruits'],
     currency: 'INR',
-    fxToInr: 1,
-    trustScore: 74,
-    dataReliability: 72,
-    legalClarity: 76,
-    transactionSecurity: 75,
-    dutyRate: 0.12,
-    vatRate: 0,
+    trustScore: 88,
+    dataReliability: 90,
+    legalClarity: 92,
+    transactionSecurity: 89,
     gstRate: 0.05,
-    compliance: [
-      'Certificate of origin',
-      'Phytosanitary certificate',
-      'FSSAI import clearance',
-      'Bill of entry',
-      'Commercial invoice and packing list',
-    ],
-    authority: 'Exporter customs authority + CBIC India + FSSAI',
-    protection: 'Escrow and enhanced document verification required before supplier settlement.',
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Batch quality report'],
+    authority: 'GSTN + FSSAI + applicable state authorities',
+    protection: 'GCTC quality verification and payment hold apply until dispatch evidence is approved.',
   },
   {
-    id: 'india-singapore',
-    from: 'Coimbatore, India',
-    to: 'Singapore',
-    searchTerms: ['singapore', 'asean', 'india', 'coimbatore', 'food export'],
+    id: 'andhra-pradesh-india',
+    from: 'West Godavari, Andhra Pradesh',
+    to: 'Pan-India delivery',
+    searchTerms: ['andhra pradesh', 'west godavari', 'cocoa', 'food processing'],
     currency: 'INR',
-    fxToInr: 1,
-    trustScore: 92,
-    dataReliability: 95,
+    trustScore: 84,
+    dataReliability: 86,
     legalClarity: 91,
+    transactionSecurity: 87,
+    gstRate: 0.05,
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Food batch test report'],
+    authority: 'GSTN + FSSAI + Andhra Pradesh authorities',
+    protection: 'GCTC verifies batch documents before seller settlement.',
+  },
+  {
+    id: 'gujarat-india',
+    from: 'Unjha, Gujarat',
+    to: 'Pan-India delivery',
+    searchTerms: ['gujarat', 'unjha', 'sesame', 'seeds', 'agri commodity'],
+    currency: 'INR',
+    trustScore: 91,
+    dataReliability: 93,
+    legalClarity: 92,
+    transactionSecurity: 91,
+    gstRate: 0.05,
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Purity and residue report'],
+    authority: 'GSTN + FSSAI + Gujarat authorities',
+    protection: 'Standard GCTC payment hold until quantity and dispatch proof are verified.',
+  },
+  {
+    id: 'telangana-india',
+    from: 'Nizamabad, Telangana',
+    to: 'Pan-India delivery',
+    searchTerms: ['telangana', 'nizamabad', 'turmeric', 'spices'],
+    currency: 'INR',
+    trustScore: 90,
+    dataReliability: 92,
+    legalClarity: 92,
     transactionSecurity: 90,
-    dutyRate: 0.04,
-    vatRate: 0.09,
-    gstRate: 0,
-    compliance: [
-      'FSSAI export batch certificate',
-      'Certificate of origin',
-      'Singapore Food Agency importer declaration',
-      'Commercial invoice and packing list',
-    ],
-    authority: 'DGFT India + Singapore Food Agency',
-    protection: 'Standard platform payment hold until dispatch proof is verified.',
+    gstRate: 0.05,
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Curcumin test report'],
+    authority: 'GSTN + FSSAI + Telangana authorities',
+    protection: 'GCTC validates quality and packing evidence before payment release.',
   },
   {
-    id: 'india-uae',
-    from: 'Mysuru, India',
-    to: 'Dubai, UAE',
-    searchTerms: ['uae', 'dubai', 'gcc', 'mysuru', 'spices'],
+    id: 'rajasthan-india',
+    from: 'Jodhpur, Rajasthan',
+    to: 'Pan-India delivery',
+    searchTerms: ['rajasthan', 'jodhpur', 'millet', 'bajra', 'grains'],
     currency: 'INR',
-    fxToInr: 1,
-    trustScore: 86,
-    dataReliability: 88,
-    legalClarity: 84,
-    transactionSecurity: 86,
-    dutyRate: 0.05,
-    vatRate: 0.05,
-    gstRate: 0,
-    compliance: [
-      'Halal suitability statement where applicable',
-      'Certificate of origin',
-      'UAE customs import declaration',
-      'Commercial invoice and packing list',
-    ],
-    authority: 'DGFT India + UAE Federal Customs Authority',
-    protection: 'Escrow optional for repeat verified buyers; recommended for first order.',
+    trustScore: 87,
+    dataReliability: 89,
+    legalClarity: 92,
+    transactionSecurity: 88,
+    gstRate: 0.05,
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Moisture and grain quality report'],
+    authority: 'GSTN + FSSAI + Rajasthan authorities',
+    protection: 'GCTC records lot quality and delivery exceptions for seller scoring.',
   },
   {
-    id: 'vietnam-india',
-    from: 'Ho Chi Minh City, Vietnam',
-    to: 'Chennai, India',
-    searchTerms: ['vietnam', 'india import', 'chennai', 'coffee', 'asean'],
+    id: 'kerala-india',
+    from: 'Idukki, Kerala',
+    to: 'Pan-India delivery',
+    searchTerms: ['kerala', 'idukki', 'cardamom', 'spices'],
     currency: 'INR',
-    fxToInr: 1,
-    trustScore: 78,
-    dataReliability: 80,
-    legalClarity: 76,
-    transactionSecurity: 79,
-    dutyRate: 0.1,
-    vatRate: 0,
-    gstRate: 0.12,
-    compliance: [
-      'Bill of entry',
-      'Plant quarantine clearance where applicable',
-      'FSSAI import clearance',
-      'Commercial invoice and packing list',
-    ],
-    authority: 'Vietnam Customs + CBIC India + FSSAI',
-    protection: 'Escrow and enhanced document verification required.',
+    trustScore: 93,
+    dataReliability: 94,
+    legalClarity: 92,
+    transactionSecurity: 93,
+    gstRate: 0.05,
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Spice quality report'],
+    authority: 'GSTN + FSSAI + Spices Board India',
+    protection: 'Verified grade and dispatch weight are locked into the GCTC order record.',
+  },
+  {
+    id: 'karnataka-india',
+    from: 'Chikkamagaluru, Karnataka',
+    to: 'Pan-India delivery',
+    searchTerms: ['karnataka', 'chikkamagaluru', 'coffee', 'robusta', 'beans'],
+    currency: 'INR',
+    trustScore: 92,
+    dataReliability: 93,
+    legalClarity: 92,
+    transactionSecurity: 92,
+    gstRate: 0.05,
+    compliance: ['GST tax invoice', 'E-way bill for applicable movement', 'Coffee grade and moisture report'],
+    authority: 'GSTN + FSSAI + Coffee Board of India',
+    protection: 'GCTC verifies grade, moisture, and dispatch evidence before settlement.',
   },
 ]
 
 export const tradeItems: TradeItem[] = [
   {
-    id: 'cashew-africa',
+    id: 'cashew-maharashtra',
     sellerId: 'seller-1',
-    corridorId: 'west-africa-india',
+    corridorId: 'maharashtra-india',
     kind: 'product',
-    productClass: 'plant',
-    name: 'Cashew kernels W320',
-    category: 'Dry fruits and edible commodities',
-    origin: 'West Africa verified supplier cluster',
+    productClass: 'food',
+    name: 'Premium cashew kernels W320',
+    category: 'Dry fruits',
+    state: 'Maharashtra',
+    origin: 'Ratnagiri verified processor cluster',
     imageUrl: '/product-images/cashews.jpg',
-    unit: '500 kg import lot',
+    unit: '500 kg wholesale lot',
     basePrice: 462000,
     priceUpdatedAt: '2026-06-28',
     procurementFrequency: 'Monthly',
     availableQty: '9 lots available',
     specs: ['W320 grade', 'Vacuum-packed cartons', 'Kernel moisture below 5%'],
-    certifications: ['Phytosanitary certificate', 'Origin certificate', 'Third-party inspection'],
-    decisionFactors: ['Competitive landed cost', 'Retail-ready grade', 'Platform-managed import paperwork'],
-    note: 'Seller identity is protected. Buyer sees origin, quality, price, and documents through GCTC only.',
+    certifications: ['FSSAI licence verified', 'Batch quality report', 'GCTC supplier verification'],
+    decisionFactors: ['Consistent wholesale grade', 'Retail-ready packing', 'Pan-India delivery available'],
+    note: 'Seller identity is protected. Buyers see verified origin, quality, availability, and the current GCTC offer.',
   },
   {
-    id: 'cocoa-africa',
+    id: 'cocoa-andhra',
     sellerId: 'seller-1',
-    corridorId: 'west-africa-india',
+    corridorId: 'andhra-pradesh-india',
     kind: 'product',
     productClass: 'food',
     name: 'Natural cocoa powder',
-    category: 'Food and everyday consumables',
-    origin: 'Ghana cocoa processing cluster',
+    category: 'Food ingredients',
+    state: 'Andhra Pradesh',
+    origin: 'West Godavari processing cluster',
     imageUrl: '/product-images/cocoa.jpg',
-    unit: '1,000 kg import lot',
+    unit: '1,000 kg wholesale lot',
     basePrice: 318000,
     priceUpdatedAt: '2026-06-24',
     procurementFrequency: 'Fortnightly',
     availableQty: '6 lots available',
     specs: ['10-12% fat', 'Fine mesh powder', 'Food-grade paper sacks with liner'],
-    certifications: ['Food safety declaration', 'Origin certificate', 'Batch COA'],
-    decisionFactors: ['Strong confectionery demand', 'Stable repeat supply', 'Inspection report available'],
-    note: 'USP: suitable for bakeries, beverage mixes, and FMCG private-label production.',
+    certifications: ['FSSAI licence verified', 'Batch COA', 'Food safety declaration'],
+    decisionFactors: ['Suitable for bakeries and beverages', 'Stable repeat supply', 'Inspection report available'],
+    note: 'Suitable for bakeries, beverage mixes, institutional buyers, and private-label food production.',
   },
   {
-    id: 'sesame-africa',
+    id: 'sesame-gujarat',
     sellerId: 'seller-1',
-    corridorId: 'west-africa-india',
+    corridorId: 'gujarat-india',
     kind: 'product',
     productClass: 'plant',
     name: 'Hulled sesame seeds',
-    category: 'Food and everyday consumables',
-    origin: 'East Africa aggregation cluster',
+    category: 'Seeds and grains',
+    state: 'Gujarat',
+    origin: 'Unjha aggregation and processing cluster',
     imageUrl: '/product-images/sesame.jpg',
-    unit: '2,000 kg import lot',
+    unit: '2,000 kg wholesale lot',
     basePrice: 286000,
     priceUpdatedAt: '2026-06-25',
     procurementFrequency: 'Monthly',
     availableQty: '7 lots available',
-    specs: ['99.95% purity', 'Hulled white sesame', '25 kg export bags'],
-    certifications: ['Phytosanitary certificate', 'Aflatoxin test', 'Origin certificate'],
-    decisionFactors: ['Good oil and bakery demand', 'Bulk supply available', 'Quality screened before dispatch'],
-    note: 'Biological benefit: common ingredient for protein-rich foods and bakery toppings.',
+    specs: ['99.95% purity', 'Hulled white sesame', '25 kg food-grade bags'],
+    certifications: ['FSSAI licence verified', 'Aflatoxin test', 'Purity report'],
+    decisionFactors: ['Bulk supply available', 'Quality screened before dispatch', 'Oil and bakery grade'],
+    note: 'A verified bulk sesame listing for food processors, oil mills, bakeries, and institutional buyers.',
   },
   {
-    id: 'turmeric-singapore',
+    id: 'turmeric-telangana',
     sellerId: 'seller-2',
-    corridorId: 'india-singapore',
+    corridorId: 'telangana-india',
     kind: 'product',
     productClass: 'food',
     name: 'Single-origin turmeric powder',
-    category: 'Food and everyday consumables',
-    origin: 'Coimbatore food cluster',
+    category: 'Spices',
+    state: 'Telangana',
+    origin: 'Nizamabad spice processing cluster',
     imageUrl: '/product-images/turmeric.jpg',
-    unit: '500 kg export lot',
+    unit: '500 kg wholesale lot',
     basePrice: 185000,
     priceUpdatedAt: '2026-06-27',
     procurementFrequency: 'Weekly',
     availableQty: '8 lots this week',
     specs: ['Curcumin 4.8%', 'Moisture below 8%', 'Food-grade laminated bulk packs'],
-    certifications: ['FSSAI', 'ISO 22000', 'Lab-tested batch COA'],
-    decisionFactors: ['High curcumin density', 'Stable weekly supply', 'ASEAN-ready documentation'],
-    note: 'Biological benefit: used as an anti-inflammatory ingredient in everyday cooking.',
+    certifications: ['FSSAI licence verified', 'ISO 22000', 'Lab-tested batch COA'],
+    decisionFactors: ['High curcumin density', 'Stable weekly supply', 'Traceable state origin'],
+    note: 'A lab-tested wholesale spice listing for food manufacturers, distributors, and retailers.',
   },
   {
-    id: 'millet-singapore',
+    id: 'millet-rajasthan',
     sellerId: 'seller-2',
-    corridorId: 'india-singapore',
+    corridorId: 'rajasthan-india',
     kind: 'product',
-    productClass: 'food',
-    name: 'Ready-to-cook millet mix',
-    category: 'Food and everyday consumables',
-    origin: 'Erode and Salem clusters',
+    productClass: 'plant',
+    name: 'Pearl millet grain',
+    category: 'Grains',
+    state: 'Rajasthan',
+    origin: 'Jodhpur farmer aggregation cluster',
     imageUrl: '/product-images/millet.jpg',
-    unit: '1,000 retail pouches',
+    unit: '2,000 kg wholesale lot',
     basePrice: 142000,
     priceUpdatedAt: '2026-06-21',
     procurementFrequency: 'Weekly',
     availableQty: '12 lots this week',
-    specs: ['Multi-millet blend', '9-month shelf life', 'Private-label packaging ready'],
-    certifications: ['FSSAI', 'NABL nutrition panel'],
-    decisionFactors: ['Good margins for ethnic retail', 'Low breakage logistics', 'Recurring weekly demand'],
-    note: 'Health benefit: high-fiber alternative for breakfast and convenience meals.',
+    specs: ['Machine-cleaned grain', 'Moisture below 12%', '50 kg food-grade bags'],
+    certifications: ['FSSAI licence verified', 'Moisture report', 'GCTC lot inspection'],
+    decisionFactors: ['Reliable bulk availability', 'Food-processing grade', 'Competitive interstate supply'],
+    note: 'Bulk pearl millet for food processors, flour mills, institutional kitchens, and distributors.',
   },
   {
-    id: 'cardamom-uae',
+    id: 'cardamom-kerala',
     sellerId: 'seller-3',
-    corridorId: 'india-uae',
+    corridorId: 'kerala-india',
     kind: 'product',
     productClass: 'plant',
     name: 'Premium green cardamom',
-    category: 'Food and everyday consumables',
-    origin: 'Mysuru and Idukki aggregation',
+    category: 'Spices',
+    state: 'Kerala',
+    origin: 'Idukki verified grower aggregation',
     imageUrl: '/product-images/cardamom.jpg',
-    unit: '120 kg carton lot',
+    unit: '120 kg wholesale lot',
     basePrice: 336000,
     priceUpdatedAt: '2026-06-26',
     procurementFrequency: 'Fortnightly',
     availableQty: '5 lots this week',
-    specs: ['7-8 mm bold grade', 'Low split percentage', 'Moisture controlled cartons'],
-    certifications: ['Spice Board India', 'FSSAI', 'Residue test report'],
-    decisionFactors: ['Premium aroma retention', 'High demand in GCC retail', 'Strong quality traceability'],
-    note: 'Biological benefit: used in digestive beverages and daily food preparations.',
+    specs: ['7-8 mm bold grade', 'Low split percentage', 'Moisture-controlled cartons'],
+    certifications: ['Spices Board registration', 'FSSAI licence verified', 'Residue test report'],
+    decisionFactors: ['Premium aroma retention', 'Strong quality traceability', 'Verified Idukki origin'],
+    note: 'Premium spice lots with verified grade, state origin, and quality documents.',
   },
   {
-    id: 'coffee-india',
+    id: 'coffee-karnataka',
     sellerId: 'seller-4',
-    corridorId: 'vietnam-india',
+    corridorId: 'karnataka-india',
     kind: 'product',
     productClass: 'plant',
     name: 'Robusta coffee beans',
-    category: 'Food and everyday consumables',
-    origin: 'Vietnamese coffee cooperative cluster',
+    category: 'Coffee',
+    state: 'Karnataka',
+    origin: 'Chikkamagaluru coffee grower cluster',
     imageUrl: '/product-images/coffee.jpg',
-    unit: '2,000 kg import lot',
+    unit: '2,000 kg wholesale lot',
     basePrice: 408000,
     priceUpdatedAt: '2026-06-23',
     procurementFrequency: 'Monthly',
     availableQty: '4 lots this week',
-    specs: ['Screen 16', 'Moisture 11-12%', 'Jute bags with liner'],
-    certifications: ['Phytosanitary certificate', 'Origin certificate', 'Quality inspection report'],
-    decisionFactors: ['Competitive landed price', 'Blending-grade consistency', 'Scalable import corridor'],
-    note: 'USP: reliable base coffee input for Indian roasters and FMCG blends.',
-  },
-  {
-    id: 'packaging-service',
-    sellerId: 'gctc-services',
-    corridorId: 'india-singapore',
-    kind: 'service',
-    productClass: 'service',
-    name: 'Export packaging compliance support',
-    category: 'Business support service',
-    origin: 'Platform verified service bench',
-    imageUrl: '/product-images/packaging.jpg',
-    unit: 'Per shipment',
-    basePrice: 24000,
-    priceUpdatedAt: '2026-06-01',
-    procurementFrequency: 'On demand',
-    availableQty: 'On-demand',
-    specs: ['Label review', 'Shelf-life and batch coding check', 'Retail carton specification'],
-    certifications: ['Platform verified', 'Export packaging specialist'],
-    decisionFactors: ['Reduces customs hold risk', 'Improves retail acceptance', 'No external vendor leakage'],
-    note: 'Scope: packaging audit and production-ready compliance checklist.',
-  },
-  {
-    id: 'quality-service',
-    sellerId: 'gctc-services',
-    corridorId: 'west-africa-india',
-    kind: 'service',
-    productClass: 'service',
-    name: 'Pre-shipment quality inspection',
-    category: 'Business support service',
-    origin: 'GCTC verified inspection desk',
-    imageUrl: '/product-images/inspection.jpg',
-    unit: 'Per shipment',
-    basePrice: 38000,
-    priceUpdatedAt: '2026-06-01',
-    procurementFrequency: 'On demand',
-    availableQty: 'On-demand',
-    specs: ['Sampling protocol', 'Photo evidence', 'Dispatch approval checklist'],
-    certifications: ['Platform verified', 'Third-party inspection partner'],
-    decisionFactors: ['Protects buyer before payment release', 'Reduces quality disputes', 'Keeps seller details private'],
-    note: 'Scope: buyer-facing inspection result without exposing the supplier contact trail.',
+    specs: ['Screen 16', 'Moisture 11-12%', 'Jute bags with food-grade liner'],
+    certifications: ['Coffee Board registration', 'Quality inspection report', 'GCTC supplier verification'],
+    decisionFactors: ['Consistent blending grade', 'Scalable domestic supply', 'Traceable Karnataka origin'],
+    note: 'Reliable bulk coffee input for roasters, beverage manufacturers, and institutional buyers.',
   },
 ]
 
 export const tradeCosts: Record<CorridorId, TradeCosts> = {
-  'west-africa-india': {
-    freight: { normal: 84000, urgent: 132000 },
-    movers: { normal: 18000, urgent: 32000 },
-  },
-  'india-singapore': {
-    freight: { normal: 32000, urgent: 56000 },
-    movers: { normal: 9000, urgent: 16000 },
-  },
-  'india-uae': {
-    freight: { normal: 42000, urgent: 71000 },
-    movers: { normal: 12000, urgent: 21000 },
-  },
-  'vietnam-india': {
-    freight: { normal: 68000, urgent: 104000 },
-    movers: { normal: 15000, urgent: 27000 },
-  },
+  'maharashtra-india': { freight: { normal: 28000, urgent: 44000 }, movers: { normal: 9000, urgent: 15000 } },
+  'andhra-pradesh-india': { freight: { normal: 36000, urgent: 54000 }, movers: { normal: 11000, urgent: 18000 } },
+  'gujarat-india': { freight: { normal: 32000, urgent: 49000 }, movers: { normal: 10000, urgent: 17000 } },
+  'telangana-india': { freight: { normal: 30000, urgent: 47000 }, movers: { normal: 9000, urgent: 16000 } },
+  'rajasthan-india': { freight: { normal: 34000, urgent: 52000 }, movers: { normal: 11000, urgent: 18000 } },
+  'kerala-india': { freight: { normal: 39000, urgent: 59000 }, movers: { normal: 12000, urgent: 20000 } },
+  'karnataka-india': { freight: { normal: 35000, urgent: 54000 }, movers: { normal: 11000, urgent: 19000 } },
 }
 
 export const platformMarginRate = 0.035
-export const escrowFeeRate = 0.012
+export const escrowFeeRate = 0.008
 export const turnkeyServiceRate = 0.045
-export const insuranceRate = 0.006
+export const insuranceRate = 0.004
 
-export const commonIndiaImportDocuments = [
+export const commonIndiaTradeDocuments = [
   'Purchase order',
-  'Commercial invoice',
+  'GST tax invoice',
   'Packing list',
-  'Bill of lading',
-  'Certificate of origin',
-  'Test reports / certificate of inspection',
-  'Insurance certificate',
+  'E-way bill where applicable',
+  'Quality / test report',
+  'Insurance certificate for GCTC delivery',
 ]
 
 export const productClassDocuments: Record<ProductClass, string[]> = {
-  food: ['FSSAI import approval', 'Health / sanitary certificate'],
-  marine: ['EIA inspection approval', 'Health certificate'],
-  plant: ['Phytosanitary certificate', 'Plant quarantine clearance'],
-  animal: ['Veterinary / animal health certificate'],
-  service: [],
+  food: ['FSSAI licence verification', 'Batch health / safety report'],
+  plant: ['FSSAI licence verification', 'Commodity quality report'],
 }
 
 export const sellerSales: SellerSale[] = [
   {
     id: 'SALE-2048',
     sellerId: 'seller-1',
-    itemId: 'cashew-africa',
-    buyerAlias: 'Buyer account IN-184',
+    itemId: 'cashew-maharashtra',
+    buyerAlias: 'Buyer account DL-184',
     soldAt: '2026-06-24',
     lots: 3,
     quantityTons: 1.5,
@@ -439,8 +409,8 @@ export const sellerSales: SellerSale[] = [
   {
     id: 'SALE-2036',
     sellerId: 'seller-1',
-    itemId: 'cocoa-africa',
-    buyerAlias: 'Buyer account IN-092',
+    itemId: 'cocoa-andhra',
+    buyerAlias: 'Buyer account MH-092',
     soldAt: '2026-06-17',
     lots: 2,
     quantityTons: 2,
@@ -452,8 +422,8 @@ export const sellerSales: SellerSale[] = [
   {
     id: 'SALE-2019',
     sellerId: 'seller-1',
-    itemId: 'sesame-africa',
-    buyerAlias: 'Buyer account IN-241',
+    itemId: 'sesame-gujarat',
+    buyerAlias: 'Buyer account KA-241',
     soldAt: '2026-06-05',
     lots: 1,
     quantityTons: 2,
@@ -465,8 +435,8 @@ export const sellerSales: SellerSale[] = [
   {
     id: 'SALE-1998',
     sellerId: 'seller-2',
-    itemId: 'turmeric-singapore',
-    buyerAlias: 'Buyer account SG-033',
+    itemId: 'turmeric-telangana',
+    buyerAlias: 'Buyer account TN-033',
     soldAt: '2026-05-28',
     lots: 4,
     quantityTons: 2,
@@ -482,7 +452,7 @@ export const logisticsPartners: LogisticsPartner[] = [
     id: 'LOG-WH-014',
     type: 'Warehouse',
     legalName: 'Harbourline Storage Private Limited',
-    corridor: 'Mumbai and Nhava Sheva',
+    corridor: 'Mumbai, Maharashtra',
     baseRatePerTon: 1450,
     distanceRatePerTonKm: 0,
     capacity: '2,400 tons',
@@ -493,7 +463,7 @@ export const logisticsPartners: LogisticsPartner[] = [
     id: 'LOG-TR-027',
     type: 'Truck',
     legalName: 'Western Freight Carriers',
-    corridor: 'Maharashtra and Gujarat',
+    corridor: 'Maharashtra, Gujarat, and Rajasthan',
     baseRatePerTon: 900,
     distanceRatePerTonKm: 4.2,
     capacity: '18 trucks',
@@ -503,8 +473,8 @@ export const logisticsPartners: LogisticsPartner[] = [
   {
     id: 'LOG-CT-009',
     type: 'Container trailer',
-    legalName: 'Portspan Trailer Services',
-    corridor: 'JNPT to western India',
+    legalName: 'Interstate Trailer Services',
+    corridor: 'West and South India',
     baseRatePerTon: 1250,
     distanceRatePerTonKm: 5.1,
     capacity: '12 trailers',
@@ -526,7 +496,7 @@ export const logisticsPartners: LogisticsPartner[] = [
     id: 'LOG-LD-044',
     type: 'Local delivery',
     legalName: 'CityDock Delivery Network',
-    corridor: 'Mumbai MMR',
+    corridor: 'Delhi NCR, Mumbai MMR, Bengaluru, and Chennai',
     baseRatePerTon: 700,
     distanceRatePerTonKm: 3.8,
     capacity: 'Same-day under 8 tons',
@@ -547,18 +517,15 @@ export function calculateInvoice(
   const freight = fulfilment === 'turnkey' ? costs.freight[freightTier] : 0
   const movers = fulfilment === 'turnkey' ? costs.movers[moverTier] : 0
   const insurance = fulfilment === 'turnkey' ? subtotal * insuranceRate : 0
-  const clearanceSupport = fulfilment === 'turnkey' ? 18500 : 0
+  const clearanceSupport = fulfilment === 'turnkey' ? 8500 : 0
   const taxableBase = subtotal + freight + movers
   const platformMargin = taxableBase * platformMarginRate
   const turnkeyServiceCharge = fulfilment === 'turnkey'
     ? (freight + movers + insurance + clearanceSupport) * turnkeyServiceRate
     : 0
-  const duty = fulfilment === 'turnkey' ? subtotal * corridor.dutyRate : 0
-  const vat = fulfilment === 'turnkey' ? (taxableBase + duty) * corridor.vatRate : 0
-  const gstBase = fulfilment === 'turnkey' ? taxableBase + duty + platformMargin : platformMargin
-  const gst = gstBase * corridor.gstRate
-  const escrowFee = corridor.trustScore < 80 ? taxableBase * escrowFeeRate : 0
-  const total = taxableBase + insurance + clearanceSupport + platformMargin + turnkeyServiceCharge + duty + vat + gst + escrowFee
+  const gst = (platformMargin + turnkeyServiceCharge) * corridor.gstRate
+  const escrowFee = corridor.trustScore < 88 ? taxableBase * escrowFeeRate : 0
+  const total = taxableBase + insurance + clearanceSupport + platformMargin + turnkeyServiceCharge + gst + escrowFee
 
   return {
     subtotal,
@@ -569,8 +536,6 @@ export function calculateInvoice(
     platformMargin,
     turnkeyServiceCharge,
     gst,
-    duty,
-    vat,
     escrowFee,
     total,
   }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import {
   calculateInvoice,
-  commonIndiaImportDocuments,
+  commonIndiaTradeDocuments,
   corridors,
   formatMoney,
   logisticsPartners,
@@ -73,12 +73,12 @@ interface PageProps {
 }
 
 interface CatalogueStore {
-  version: 1
+  version: 2
   items: TradeItem[]
   priceAudits: PriceAuditEntry[]
 }
 
-const catalogueStorageKey = 'gctc-catalogue-v1'
+const catalogueStorageKey = 'gctc-catalogue-v2'
 
 const demoUsers: DemoUser[] = [
   {
@@ -86,7 +86,7 @@ const demoUsers: DemoUser[] = [
     name: 'Aarav Mehta',
     email: 'buyer@gctc.demo',
     role: 'buyer',
-    organization: 'Mehta Retail Imports',
+    organization: 'Mehta Retail Procurement',
   },
   {
     id: 'seller-1',
@@ -138,20 +138,20 @@ const routePaths: Record<RouteId, string> = {
 const sampleOrders: Order[] = [
   {
     id: 'GCTC-1027',
-    itemId: 'cashew-africa',
-    buyer: 'Mehta Retail Imports',
-    status: 'Customs documents under review',
-    amount: 661948,
-    corridor: 'West Africa supplier network to Mumbai, India',
-    protection: 'Escrow active',
+    itemId: 'cashew-maharashtra',
+    buyer: 'Mehta Retail Procurement',
+    status: 'Quality documents approved',
+    amount: 556240,
+    corridor: 'Ratnagiri, Maharashtra to Delhi NCR',
+    protection: 'Payment hold active',
   },
   {
     id: 'GCTC-1018',
-    itemId: 'turmeric-singapore',
-    buyer: 'Lion City Foods',
-    status: 'Packed and awaiting freight pickup',
-    amount: 270128,
-    corridor: 'Coimbatore, India to Singapore',
+    itemId: 'turmeric-telangana',
+    buyer: 'South India Foods',
+    status: 'Packed and awaiting interstate pickup',
+    amount: 241690,
+    corridor: 'Nizamabad, Telangana to Bengaluru, Karnataka',
     protection: 'Platform hold',
   },
 ]
@@ -159,35 +159,33 @@ const sampleOrders: Order[] = [
 function loadCatalogueStore(): CatalogueStore {
   try {
     const stored = window.localStorage.getItem(catalogueStorageKey)
-    if (!stored) return { version: 1, items: tradeItems, priceAudits: [] }
+    if (!stored) return { version: 2, items: tradeItems, priceAudits: [] }
     const parsed = JSON.parse(stored) as CatalogueStore
-    if (parsed.version !== 1 || !Array.isArray(parsed.items) || !Array.isArray(parsed.priceAudits)) {
-      return { version: 1, items: tradeItems, priceAudits: [] }
+    if (parsed.version !== 2 || !Array.isArray(parsed.items) || !Array.isArray(parsed.priceAudits)) {
+      return { version: 2, items: tradeItems, priceAudits: [] }
     }
     const storedById = new Map(parsed.items.map((item) => [item.id, item]))
     const mergedItems = tradeItems.map((item) => ({ ...item, ...storedById.get(item.id) }))
-    return { version: 1, items: mergedItems, priceAudits: parsed.priceAudits }
+    return { version: 2, items: mergedItems, priceAudits: parsed.priceAudits }
   } catch {
-    return { version: 1, items: tradeItems, priceAudits: [] }
+    return { version: 2, items: tradeItems, priceAudits: [] }
   }
 }
 
-const categoryTabs = ['All', 'Food & Spice', 'Dry fruits', 'Business support', 'Coffee', 'Services'] as const
+const categoryTabs = ['All', 'Food ingredients', 'Spices', 'Dry fruits', 'Grains', 'Coffee'] as const
 type CategoryTab = (typeof categoryTabs)[number]
 
-const originOptions = ['Africa', 'India', 'Vietnam', 'Platform'] as const
-type OriginFilter = (typeof originOptions)[number]
+const stateOptions = ['Maharashtra', 'Andhra Pradesh', 'Gujarat', 'Telangana', 'Rajasthan', 'Kerala', 'Karnataka'] as const
+type StateFilter = (typeof stateOptions)[number]
 
 const productCardMeta: Record<string, { caption: string; rating: string; sold: string }> = {
-  'cashew-africa': { caption: 'cashew kernels', rating: '4.9', sold: '1.8k lots' },
-  'cocoa-africa': { caption: 'natural cocoa', rating: '4.8', sold: '920 lots' },
-  'sesame-africa': { caption: 'hulled sesame', rating: '4.7', sold: '1.1k lots' },
-  'turmeric-singapore': { caption: 'turmeric powder', rating: '4.9', sold: '740 lots' },
-  'millet-singapore': { caption: 'millet pouches', rating: '4.6', sold: '680 lots' },
-  'cardamom-uae': { caption: 'green cardamom', rating: '4.8', sold: '410 lots' },
-  'coffee-india': { caption: 'robusta beans', rating: '4.7', sold: '520 lots' },
-  'packaging-service': { caption: 'export packaging', rating: '4.9', sold: '260 jobs' },
-  'quality-service': { caption: 'quality inspection', rating: '4.9', sold: '310 jobs' },
+  'cashew-maharashtra': { caption: 'cashew kernels', rating: '4.9', sold: '1.8k lots' },
+  'cocoa-andhra': { caption: 'natural cocoa', rating: '4.8', sold: '920 lots' },
+  'sesame-gujarat': { caption: 'hulled sesame', rating: '4.7', sold: '1.1k lots' },
+  'turmeric-telangana': { caption: 'turmeric powder', rating: '4.9', sold: '740 lots' },
+  'millet-rajasthan': { caption: 'pearl millet', rating: '4.6', sold: '680 lots' },
+  'cardamom-kerala': { caption: 'green cardamom', rating: '4.8', sold: '410 lots' },
+  'coffee-karnataka': { caption: 'robusta beans', rating: '4.7', sold: '520 lots' },
 }
 
 function getCorridor(item: TradeItem) {
@@ -195,36 +193,25 @@ function getCorridor(item: TradeItem) {
 }
 
 function getSellerAlias(item: TradeItem) {
-  if (item.kind === 'service') return 'GCTC service bench'
-  if (item.origin.toLowerCase().includes('africa')) return 'Verified origin cluster'
-  if (item.origin.toLowerCase().includes('vietnam')) return 'ASEAN supplier desk'
-  return 'GCTC verified seller'
+  return `GCTC verified seller · ${item.state}`
 }
 
-function getOriginLabel(item: TradeItem) {
-  const corridor = getCorridor(item)
-  if (corridor.id === 'west-africa-india') return 'Africa · IN'
-  if (corridor.id === 'india-singapore') return 'India · SG'
-  if (corridor.id === 'india-uae') return 'India · UAE'
-  return 'Vietnam · IN'
-}
-
-function getOriginFilter(item: TradeItem): OriginFilter {
-  if (item.kind === 'service') return 'Platform'
-  const corridor = getCorridor(item)
-  if (corridor.id === 'west-africa-india') return 'Africa'
-  if (corridor.id === 'vietnam-india') return 'Vietnam'
-  return 'India'
+function getStateLabel(item: TradeItem) {
+  const abbreviations: Record<StateFilter, string> = {
+    Maharashtra: 'MH',
+    'Andhra Pradesh': 'AP',
+    Gujarat: 'GJ',
+    Telangana: 'TS',
+    Rajasthan: 'RJ',
+    Kerala: 'KL',
+    Karnataka: 'KA',
+  }
+  return `${abbreviations[item.state as StateFilter]} · INDIA`
 }
 
 function categoryMatches(item: TradeItem, category: CategoryTab) {
   if (category === 'All') return true
-  const haystack = `${item.name} ${item.category} ${item.kind}`.toLowerCase()
-  if (category === 'Food & Spice') return haystack.includes('food') || haystack.includes('spice') || haystack.includes('consumable')
-  if (category === 'Dry fruits') return haystack.includes('dry fruits') || haystack.includes('cashew')
-  if (category === 'Business support') return item.kind === 'service'
-  if (category === 'Coffee') return haystack.includes('coffee')
-  return item.kind === 'service'
+  return item.category.toLowerCase() === category.toLowerCase()
 }
 
 function getNavItems(role: Role): NavItem[] {
@@ -265,6 +252,7 @@ function itemMatchesQuery(item: TradeItem, query: string) {
   const haystack = [
     item.name,
     item.category,
+    item.state,
     item.origin,
     item.unit,
     item.availableQty,
@@ -301,7 +289,7 @@ function App() {
   const [catalogueStore, setCatalogueStore] = useState<CatalogueStore>(loadCatalogueStore)
   const [query, setQuery] = useState('')
   const [submittedQuery, setSubmittedQuery] = useState('')
-  const [selectedItemId, setSelectedItemId] = useState('cashew-africa')
+  const [selectedItemId, setSelectedItemId] = useState('cashew-maharashtra')
   const [freightTier, setFreightTier] = useState<DeliveryTier>('normal')
   const [moverTier, setMoverTier] = useState<DeliveryTier>('normal')
   const [fulfilment, setFulfilment] = useState<FulfilmentOption>('turnkey')
@@ -498,7 +486,7 @@ function Sidebar({
             </button>
           ))}
         </nav>
-        <span className="prototype-meta">Responsive web · Ship to India</span>
+        <span className="prototype-meta">Products sourced across India</span>
       </div>
 
       <div className="commerce-bar">
@@ -509,18 +497,18 @@ function Sidebar({
         <label className="commerce-search">
           <Icon name="marketplace" />
           <input
-            aria-label="Search products from global corridors"
+            aria-label="Search products by name, category, or Indian state"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') handleSearch()
             }}
-            placeholder="Search products from verified corridors"
+            placeholder="Search products or states across India"
           />
         </label>
         <div className="commerce-actions">
           <button className="commerce-select" type="button">
-            Ship to India <span aria-hidden="true">▾</span>
+            Deliver in India <span aria-hidden="true">▾</span>
           </button>
           <button className="commerce-select" type="button">
             INR <span aria-hidden="true">▾</span>
@@ -555,7 +543,7 @@ function Header({
     <header className="topbar">
       <div>
         <span className="route-kicker">{routeTitles[route]}</span>
-        <h1>{route === 'marketplace' ? 'Shop verified global trade products' : routeTitles[route]}</h1>
+        <h1>{route === 'marketplace' ? 'Shop verified products across India' : routeTitles[route]}</h1>
         <p>{headerCopy(route, user.role)}</p>
       </div>
       <div className="topbar-actions">
@@ -576,11 +564,11 @@ function Header({
 function headerCopy(route: RouteId, role: Role) {
   if (route === 'seller') return 'Manage listings, documents, fulfilment, and settlement without direct buyer bypass.'
   if (route === 'admin') return 'Operate verification, compliance, risk controls, seller onboarding, and platform revenue.'
-  if (route === 'orders') return 'Track orders from payment to supplier confirmation, customs, dispatch, and delivery.'
-  if (route === 'checkout') return 'Review the landed cost and pay GCTC upfront before supplier settlement.'
+  if (route === 'orders') return 'Track orders from payment to seller confirmation, dispatch, interstate transit, and delivery.'
+  if (route === 'checkout') return 'Review the delivered cost and pay GCTC upfront before seller settlement.'
   if (route === 'login') return 'Use demo roles to test buyer, seller, and admin permission levels.'
   if (role === 'seller') return 'Seller account active. Buyer marketplace still masks your direct identity.'
-  return 'Amazon-style buying for cross-border commerce, with GCTC-managed sellers, logistics, taxes, and payment.'
+  return 'Amazon-style wholesale buying across Indian states, with verified sellers, transparent pricing, logistics, and payment.'
 }
 
 function MarketplacePage({
@@ -589,21 +577,21 @@ function MarketplacePage({
   visibleItems,
 }: PageProps) {
   const [category, setCategory] = useState<CategoryTab>('All')
-  const [selectedOrigins, setSelectedOrigins] = useState<OriginFilter[]>([...originOptions])
+  const [selectedStates, setSelectedStates] = useState<StateFilter[]>([])
   const [maxPrice, setMaxPrice] = useState(900000)
   const [protectedOnly, setProtectedOnly] = useState(true)
 
   const marketItems = visibleItems.filter((item) => {
     const corridor = getCorridor(item)
     const landed = calculateInvoice(corridor, item, 'normal', 'normal').total
-    const originMatch = selectedOrigins.length === 0 || selectedOrigins.includes(getOriginFilter(item))
+    const stateMatch = selectedStates.length === 0 || selectedStates.includes(item.state as StateFilter)
     const protectionMatch = !protectedOnly || corridor.transactionSecurity >= 75
-    return categoryMatches(item, category) && originMatch && landed <= maxPrice && protectionMatch
+    return categoryMatches(item, category) && stateMatch && landed <= maxPrice && protectionMatch
   })
 
-  function toggleOrigin(origin: OriginFilter) {
-    setSelectedOrigins((current) =>
-      current.includes(origin) ? current.filter((item) => item !== origin) : [...current, origin],
+  function toggleState(state: StateFilter) {
+    setSelectedStates((current) =>
+      current.includes(state) ? current.filter((item) => item !== state) : [...current, state],
     )
   }
 
@@ -611,10 +599,10 @@ function MarketplacePage({
     <div className="discover-page">
       <section className="discover-hero">
         <div className="discover-hero-copy">
-          <span>All-in pricing · protected suppliers</span>
-          <h1>Shop the world. One honest price.</h1>
+          <span>Verified products · state-level sourcing</span>
+          <h1>Source across India. One trusted price.</h1>
           <p>
-            Duties, taxes, shipping, platform fulfilment, and buyer protection are calculated before you buy, with seller identity protected by GCTC.
+            Compare verified products from Indian states with GST, transport, handling, and buyer protection calculated before you order.
           </p>
           <div className="discover-hero-actions">
             <button
@@ -633,8 +621,8 @@ function MarketplacePage({
           </div>
         </div>
         <div className="discover-hero-media">
-          <img src="/landing-hero-global-trade.png" alt="Global trade goods with shipping documents" />
-          <span>global goods · GCTC managed trade</span>
+          <img src="/landing-hero-global-trade.png" alt="Wholesale products and trade documents for Indian buyers" />
+          <span>Indian products · GCTC managed procurement</span>
         </div>
       </section>
 
@@ -650,16 +638,16 @@ function MarketplacePage({
         <FilterPanel
           maxPrice={maxPrice}
           protectedOnly={protectedOnly}
-          selectedOrigins={selectedOrigins}
+          selectedStates={selectedStates}
           setMaxPrice={setMaxPrice}
           setProtectedOnly={setProtectedOnly}
-          toggleOrigin={toggleOrigin}
+          toggleState={toggleState}
           totalCount={marketItems.length}
         />
         <div className="discover-results">
           <div className="discover-results-head">
             <div>
-              <h2>{submittedQuery ? `${marketItems.length} verified listings for “${submittedQuery}”` : 'Trending across borders'}</h2>
+              <h2>{submittedQuery ? `${marketItems.length} verified listings for “${submittedQuery}”` : 'Products from across India'}</h2>
               <p>Supplier details are masked. Every listing is fulfilled through GCTC checkout.</p>
             </div>
             <button className="sort-button" type="button">
@@ -674,7 +662,7 @@ function MarketplacePage({
           {marketItems.length === 0 && (
             <div className="empty-results">
               <h3>No matching listings</h3>
-              <p>Try another category, origin, or higher all-in price range.</p>
+              <p>Try another category, state, or higher delivered-price range.</p>
             </div>
           )}
         </div>
@@ -700,8 +688,8 @@ function CatalogueCard({ item, onSelect }: { item: TradeItem; onSelect: () => vo
     >
       <div className="item-media">
         <img className="item-image" src={item.imageUrl} alt={item.name} loading="lazy" />
-        <span className="origin-chip">{getOriginLabel(item)}</span>
-        <span className="duties-chip">Duties in</span>
+        <span className="origin-chip">{getStateLabel(item)}</span>
+        <span className="duties-chip">Verified</span>
         <span className="media-caption">{meta.caption}</span>
       </div>
       <div className="item-body">
@@ -710,7 +698,7 @@ function CatalogueCard({ item, onSelect }: { item: TradeItem; onSelect: () => vo
         <div className="price-row">
           <div>
             <strong>{formatMoney(landedTotal, corridor.currency)}</strong>
-            <span>All-in · base {formatMoney(item.basePrice, corridor.currency)}</span>
+            <span>Delivered · product {formatMoney(item.basePrice, corridor.currency)}</span>
           </div>
           <span className="rating">★ {meta.rating} · {meta.sold}</span>
         </div>
@@ -722,18 +710,18 @@ function CatalogueCard({ item, onSelect }: { item: TradeItem; onSelect: () => vo
 function FilterPanel({
   maxPrice,
   protectedOnly,
-  selectedOrigins,
+  selectedStates,
   setMaxPrice,
   setProtectedOnly,
-  toggleOrigin,
+  toggleState,
   totalCount,
 }: {
   maxPrice: number
   protectedOnly: boolean
-  selectedOrigins: OriginFilter[]
+  selectedStates: StateFilter[]
   setMaxPrice: (price: number) => void
   setProtectedOnly: (enabled: boolean) => void
-  toggleOrigin: (origin: OriginFilter) => void
+  toggleState: (state: StateFilter) => void
   totalCount: number
 }) {
   return (
@@ -743,18 +731,18 @@ function FilterPanel({
         <span>{totalCount} results</span>
       </div>
       <div className="filter-section">
-        <h3>Ships from</h3>
-        {originOptions.map((origin) => (
-          <label className="filter-check" key={origin}>
-            <input checked={selectedOrigins.includes(origin)} type="checkbox" onChange={() => toggleOrigin(origin)} />
-            <span>{origin}</span>
+        <h3>Source state</h3>
+        {stateOptions.map((state) => (
+          <label className="filter-check" key={state}>
+            <input checked={selectedStates.includes(state)} type="checkbox" onChange={() => toggleState(state)} />
+            <span>{state}</span>
           </label>
         ))}
       </div>
       <div className="filter-section">
-        <h3>All-in price (India)</h3>
+        <h3>Delivered price</h3>
         <input
-          aria-label="Maximum all-in price"
+          aria-label="Maximum delivered price"
           max="1200000"
           min="50000"
           step="25000"
@@ -812,7 +800,7 @@ function InfoColumns({ corridor, item }: { corridor: Corridor; item: TradeItem }
       </div>
       <div>
         <strong>Trust</strong>
-        <span>{corridor.trustScore}% corridor trust</span>
+        <span>{corridor.trustScore}% sourcing-route trust</span>
         <span>{corridor.protection}</span>
         <span>Price updated {item.priceUpdatedAt}</span>
         <span>Procurement: {item.procurementFrequency}</span>
@@ -867,8 +855,8 @@ function BuyBox({
       {fulfilment === 'turnkey' ? (
         <>
           <QuotePanel
-            title="Freight"
-            description="Delivery option"
+            title="Interstate transport"
+            description="Delivery speed"
             selected={freightTier}
             normal={calculateInvoice(corridor, selectedItem, 'normal', moverTier, fulfilment).freight}
             urgent={calculateInvoice(corridor, selectedItem, 'urgent', moverTier, fulfilment).freight}
@@ -890,7 +878,7 @@ function BuyBox({
       ) : (
         <div className="buyer-responsibility">
           <Icon name="Document" />
-          <span>Buyer arranges freight, receiving-port clearance, insurance, and inland delivery.</span>
+          <span>Buyer arranges pickup, interstate transport, transit insurance, and final delivery.</span>
         </div>
       )}
       <button type="button" onClick={onContinue ?? (() => navigate('cart'))}>
@@ -911,12 +899,12 @@ function FulfilmentSelector({
     {
       id: 'sourcing-only',
       title: 'Option 1 · GCTC sourcing',
-      description: 'Product sourcing at the agreed quality, quantity, price, and frequency. Buyer manages shipment and destination clearance.',
+      description: 'Product sourcing at the agreed quality, quantity, price, and frequency. Buyer manages pickup and interstate transport.',
     },
     {
       id: 'turnkey',
-      title: 'Option 2 · GCTC turnkey',
-      description: 'Product, freight, insurance, clearance support, handling, and shipment coordination under one GCTC package.',
+      title: 'Option 2 · GCTC delivered',
+      description: 'Product, interstate transport, transit insurance, handling, and delivery coordination under one GCTC package.',
     },
   ]
 
@@ -1007,7 +995,7 @@ function CartPage(props: PageProps) {
           <div>
             <strong>{selectedItem.name}</strong>
             <span>{lotCount} lot · {selectedItem.unit}</span>
-            <span>{fulfilment === 'turnkey' ? 'GCTC turnkey fulfilment' : 'GCTC sourcing only · buyer-managed logistics'}</span>
+            <span>{fulfilment === 'turnkey' ? 'GCTC delivered fulfilment' : 'GCTC sourcing only · buyer-managed transport'}</span>
             <span>Seller identity protected by GCTC</span>
           </div>
           <strong>{formatMoney(invoice.subtotal, corridor.currency)}</strong>
@@ -1028,8 +1016,8 @@ function CheckoutPage(props: PageProps) {
         <h2>Pay GCTC upfront</h2>
         <p>
           {fulfilment === 'turnkey'
-            ? 'GCTC coordinates the product, freight, insurance, clearance support, and inland handling under one package.'
-            : 'GCTC secures the product order. Your team remains responsible for shipment, receiving-port clearance, insurance, and inland delivery.'}
+            ? 'GCTC coordinates the product, interstate transport, transit insurance, handling, and delivery under one package.'
+            : 'GCTC secures the product order. Your team remains responsible for pickup, interstate transport, transit insurance, and final delivery.'}
         </p>
         <div className="checkout-steps">
           <span className="active">Address locked</span>
@@ -1056,14 +1044,12 @@ function InvoicePanel({
 }: PageProps & { primaryAction?: string; onPrimary?: () => void }) {
   const rows = [
     [`Seller-authorised offer x ${lotCount}`, invoice.subtotal],
-    ['Freight', invoice.freight],
+    ['Interstate transport', invoice.freight],
     ['Packing/handling', invoice.movers],
-    ['Insurance', invoice.insurance],
-    ['Clearance support', invoice.clearanceSupport],
+    ['Transit insurance', invoice.insurance],
+    ['Delivery coordination', invoice.clearanceSupport],
     ['GCTC margin', invoice.platformMargin],
-    ['Turnkey service charge', invoice.turnkeyServiceCharge],
-    ['Customs duty', invoice.duty],
-    ['VAT/import levy', invoice.vat],
+    ['Delivered service charge', invoice.turnkeyServiceCharge],
     ['GST', invoice.gst],
     ['Escrow protection', invoice.escrowFee],
   ] as const
@@ -1074,7 +1060,7 @@ function InvoicePanel({
         <span>Checkout summary</span>
         <strong>{selectedItem.name}</strong>
         <p>{corridor.from} to {corridor.to}</p>
-        <small>{fulfilment === 'turnkey' ? 'Option 2 · GCTC turnkey package' : 'Option 1 · GCTC sourcing only'}</small>
+        <small>{fulfilment === 'turnkey' ? 'Option 2 · GCTC delivered package' : 'Option 1 · GCTC sourcing only'}</small>
       </div>
       <div className="invoice-rows">
         {rows.map(([label, value]) => (
@@ -1085,7 +1071,7 @@ function InvoicePanel({
         ))}
       </div>
       <div className="invoice-total" data-testid="invoice-total">
-        <span>{fulfilment === 'turnkey' ? 'Final landed amount' : 'GCTC payable amount'}</span>
+        <span>{fulfilment === 'turnkey' ? 'Final delivered amount' : 'GCTC payable amount'}</span>
         <strong>{formatMoney(invoice.total, corridor.currency)}</strong>
       </div>
       <div className={`payment-state ${paymentStatus}`}>
@@ -1107,7 +1093,7 @@ function InvoicePanel({
 
 function DocumentChecklist({ corridor, item }: { corridor: Corridor; item: TradeItem }) {
   const documents = Array.from(new Set([
-    ...(corridor.to.toLowerCase().includes('india') ? commonIndiaImportDocuments : []),
+    ...commonIndiaTradeDocuments,
     ...corridor.compliance,
     ...productClassDocuments[item.productClass],
   ]))
@@ -1125,7 +1111,7 @@ function DocumentChecklist({ corridor, item }: { corridor: Corridor; item: Trade
 }
 
 function OrdersPage({ catalogueItems, paymentStatus, user }: PageProps) {
-  const tracking = ['Payment received', 'Supplier confirmed', 'Packed', 'Export docs', 'Customs', 'Delivered']
+  const tracking = ['Payment received', 'Seller confirmed', 'Packed', 'Documents', 'In transit', 'Delivered']
   const activeIndex = paymentStatus === 'secured' ? 1 : 0
   return (
     <section className="panel">
@@ -1134,7 +1120,7 @@ function OrdersPage({ catalogueItems, paymentStatus, user }: PageProps) {
           <span>{user.role === 'buyer' ? 'My orders' : 'Order operations'}</span>
           <h2>Trade tracking</h2>
         </div>
-        <p>Amazon-style order status, adapted for international trade controls.</p>
+        <p>Amazon-style order status, adapted for interstate wholesale procurement.</p>
       </div>
       <div className="order-grid">
         {sampleOrders.map((order) => {
@@ -1337,7 +1323,7 @@ function AdminPage({ catalogueItems, user }: PageProps) {
 
   return (
     <section className="dashboard-grid">
-      <MetricCard label="GMV pipeline" value="₹2.8Cr" detail="Across 4 demo corridors" />
+      <MetricCard label="GMV pipeline" value="₹2.8Cr" detail="Across 7 Indian sourcing states" />
       <MetricCard label="Seller quality review" value={String(reviewSales.length)} detail="Sales with quality or dispute exceptions" />
       <MetricCard label="Logistics partners" value={String(logisticsPartners.length)} detail="Private operator directory and tariffs" />
       <article className="panel wide-panel">
@@ -1384,14 +1370,14 @@ function AdminPage({ catalogueItems, user }: PageProps) {
         </div>
       </article>
       <article className="panel">
-        <span>India import controls</span>
+        <span>Domestic trade controls</span>
         <h2>Core document pack</h2>
-        <p>{commonIndiaImportDocuments.join(' · ')}</p>
+        <p>{commonIndiaTradeDocuments.join(' · ')}</p>
       </article>
       <article className="panel">
         <span>Category approvals</span>
         <h2>Conditional documents</h2>
-        <p>Food: FSSAI · Marine: EIA and health certificate · Plant: phytosanitary · Animal: veterinary certification.</p>
+        <p>Food products: FSSAI and batch safety reports · Plant commodities: FSSAI and commodity quality reports.</p>
       </article>
     </section>
   )
@@ -1424,10 +1410,10 @@ function LoginPage({ loginAs }: { loginAs: (user: DemoUser) => void }) {
           <strong>GCTC</strong>
         </div>
         <div>
-          <h2>Buy and sell across borders, honestly.</h2>
-          <p>Demo the platform from buyer, seller, and admin levels with prepaid duties, locked totals, and protected counterparties.</p>
+          <h2>Source across India, confidently.</h2>
+          <p>Demo the platform from buyer, seller, and admin levels with verified products, locked totals, and protected counterparties.</p>
           <ul>
-            <li>Buyer sees landed cost before checkout</li>
+            <li>Buyer sees delivered cost before checkout</li>
             <li>Seller receives controlled platform orders</li>
             <li>Admin governs verification and risk</li>
           </ul>

@@ -1,24 +1,24 @@
 # GCTC MVP
 
-GCTC, the Global Chamber of Trade and Commerce, is a mobile-first PWA prototype for an Amazon-inspired B2B trade product. It demonstrates buyer marketplace pages, role-based demo login, seller center, admin console, product search, anonymised catalogue, product detail, trade cart, landed-cost checkout, logistics, tax/duty calculation, and upfront payment state.
+GCTC, the Global Chamber of Trade and Commerce, is a mobile-first PWA prototype for an Amazon-inspired Indian B2B product marketplace. It demonstrates buyer marketplace pages, role-based demo login, seller center, admin console, state-based product search, anonymised catalogue, product detail, trade cart, delivered-cost checkout, logistics, GST calculation, and upfront payment state.
 
 ## What Is Built
 
 - Responsive React + TypeScript + Vite PWA.
 - Multi-page client routing for marketplace, product, cart, checkout, orders, seller center, admin console, account, and login.
 - Demo role switching for buyer, seller, and admin permission levels.
-- Amazon-style buyer flow: search, results, product detail, trade cart, checkout, and order tracking.
+- Amazon-style buyer flow: search, state and category filters, product detail, trade cart, checkout, and order tracking.
 - Seller center for inventory, fulfilment, settlement holds, and seller-side no-bypass rules.
 - Seller-owned pricing: the demo seller can update only products assigned to that account, with a required reason and local audit history.
 - Seller sales and quality report with CSV export, anonymised buyer references, fulfilment scope, tonnage, disputes, and acceptance state.
-- Two buyer scopes: GCTC sourcing with buyer-managed logistics, or a GCTC turnkey product and shipment package.
-- India import document packs covering invoice, packing list, bill of lading, certificate of origin, inspection/test reports, insurance, and category approvals.
+- Two buyer scopes: GCTC sourcing with buyer-managed interstate transport, or a GCTC delivered product and logistics package.
+- Domestic trade document packs covering purchase order, GST invoice, packing list, e-way bill, inspection/test reports, insurance, and FSSAI verification.
 - Admin console for seller quality exceptions and a private logistics directory for warehouses, trucks, container trailers, movers, and local delivery tariffs.
-- Cross-border corridor search for West Africa-India, India-Singapore, India-UAE, and Vietnam-India.
-- Generic food/everyday-consumable catalogue with prices, specs, certifications, and benefits.
+- Product sourcing across Maharashtra, Andhra Pradesh, Gujarat, Telangana, Rajasthan, Kerala, and Karnataka.
+- Physical food, spice, grain, dry-fruit, and coffee products with prices, specs, certifications, and benefits.
 - Supplier identity protection by design: buyer-facing data does not include supplier contact fields.
-- Dynamic invoice calculation for product/service, freight, movers, platform margin, duty, VAT, GST, and escrow.
-- Compliance checklist per corridor.
+- Dynamic invoice calculation for products, interstate transport, handling, insurance, platform margin, GST, and payment protection.
+- Compliance checklist per state sourcing route.
 - Payment state simulation for upfront payment and escrow-required corridors.
 
 ## Demo Logins
@@ -64,8 +64,6 @@ Product photos are local prototype assets under `public/product-images`, sourced
 - Millet: `File:Millet grains.jpg`
 - Cardamom: `File:Cardamom Large.JPG`
 - Coffee: `File:Coffee beans robusta.jpg`
-- Packaging: `File:Eco-friendly cardboard packaging for takeaways.jpg`
-- Inspection: `File:Pre Trip Checklist (5161314421).jpg`
 
 ## Best-Fit Production Stack
 
