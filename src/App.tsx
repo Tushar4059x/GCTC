@@ -165,7 +165,13 @@ function loadCatalogueStore(): CatalogueStore {
       return { version: 2, items: tradeItems, priceAudits: [] }
     }
     const storedById = new Map(parsed.items.map((item) => [item.id, item]))
-    const mergedItems = tradeItems.map((item) => ({ ...item, ...storedById.get(item.id) }))
+    // Only seller-editable pricing fields persist; everything else always comes
+    // from the shipped catalogue so code updates reach returning visitors.
+    const mergedItems = tradeItems.map((item) => {
+      const stored = storedById.get(item.id)
+      if (!stored || !Number.isFinite(stored.basePrice) || stored.basePrice <= 0) return item
+      return { ...item, basePrice: stored.basePrice, priceUpdatedAt: stored.priceUpdatedAt ?? item.priceUpdatedAt }
+    })
     return { version: 2, items: mergedItems, priceAudits: parsed.priceAudits }
   } catch {
     return { version: 2, items: tradeItems, priceAudits: [] }
@@ -206,12 +212,13 @@ function getStateLabel(item: TradeItem) {
     Kerala: 'KL',
     Karnataka: 'KA',
   }
-  return `${abbreviations[item.state as StateFilter]} · INDIA`
+  return `${abbreviations[item.state as StateFilter] ?? item.state} · INDIA`
 }
 
 function categoryMatches(item: TradeItem, category: CategoryTab) {
   if (category === 'All') return true
-  return item.category.toLowerCase() === category.toLowerCase()
+  // Substring match so e.g. the Grains tab also covers 'Seeds and grains'.
+  return item.category.toLowerCase().includes(category.toLowerCase())
 }
 
 function getNavItems(role: Role): NavItem[] {
@@ -306,10 +313,10 @@ function App() {
     window.localStorage.setItem(catalogueStorageKey, JSON.stringify(catalogueStore))
   }, [catalogueStore])
 
-  const visibleItems = useMemo(() => {
-    const matches = catalogueStore.items.filter((item) => itemMatchesQuery(item, submittedQuery))
-    return matches.length > 0 ? matches : catalogueStore.items
-  }, [catalogueStore.items, submittedQuery])
+  const visibleItems = useMemo(
+    () => catalogueStore.items.filter((item) => itemMatchesQuery(item, submittedQuery)),
+    [catalogueStore.items, submittedQuery],
+  )
 
   const selectedItem = useMemo(
     () => catalogueStore.items.find((item) => item.id === selectedItemId) ?? visibleItems[0] ?? catalogueStore.items[0],
@@ -680,7 +687,10 @@ function CatalogueCard({ item, onSelect }: { item: TradeItem; onSelect: () => vo
       className="item-card"
       onClick={onSelect}
       onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onSelect()
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect()
+        }
       }}
       role="button"
       tabIndex={0}
@@ -1356,7 +1366,7 @@ function AdminPage({ catalogueItems, user }: PageProps) {
         </div>
         <div className="report-table">
           <div className="report-row report-head">
-            <span>Sale</span><span>Seller</span><span>Product</span><span>Disputes</span><span>State</span>
+            <span>Sale</span><span>Seller</span><span>Product</span><span>Disputes</span><span>Quality</span>
           </div>
           {reviewSales.map((sale) => (
             <div className="report-row" key={sale.id}>
