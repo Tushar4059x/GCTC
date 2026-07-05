@@ -1,13 +1,28 @@
 # Security Model
 
-## Current MVP Controls
+## Implemented Controls
 
-- Supplier anonymity is enforced at the data-model level: buyer-facing catalogue items contain origin clusters and verification facts, not direct supplier contacts.
-- Invoice numbers are computed from typed state-route data rather than free-form UI strings.
-- The service worker caches only static shell assets and avoids invoice/document URL paths.
-- Payment is simulated in the client; no card or bank data is collected in this MVP.
-- Seller price edits are ownership-checked in the demo state and produce an audit entry, but browser code is not a production authorization boundary.
-- Logistics contractor identities appear only on the admin screen; buyer screens receive GCTC-managed service scopes and totals.
+- Authentication is server-side: scrypt-hashed passwords, random session tokens stored
+  hashed in Postgres, delivered as signed httpOnly SameSite cookies (Secure in
+  production). Logout revokes the DB session.
+- Every route derives actor and tenant from the server session; role guards protect
+  seller and admin surfaces. The client never supplies `seller_id` or totals.
+- All money is computed server-side: quotes are expiring server-priced snapshots, and
+  checkout accepts only a quote ID. A seller price change bumps an optimistic-lock
+  version, writes an append-only price revision (actor, reason, old/new, timestamp), and
+  expires open quotes for that product.
+- Supplier anonymity is enforced in API serialization: buyer catalogue payloads carry no
+  seller identity; seller order/report views get anonymised buyer references; the
+  logistics partner directory is admin-only.
+- Login attempts are rate limited per IP on a stricter bucket than the global API limit;
+  the API sheds load under event-loop pressure instead of queueing unbounded work.
+- Seller CSV exports are generated server-side with spreadsheet-formula injection
+  escaping.
+- Security headers (CSP, nosniff, frame denial, referrer and permissions policies) are
+  set by nginx for the web app and by helmet for the API. The service worker never caches
+  `/api` responses.
+- Payment capture is still simulated — no card or bank data is collected. Session
+  secrets and database credentials come from the environment, never the repository.
 
 ## Production Requirements
 

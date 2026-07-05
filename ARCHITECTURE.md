@@ -1,10 +1,31 @@
 # Architecture
 
-## MVP Shape
+## Implemented shape
 
-This repository starts as a React + TypeScript PWA because it gives the fastest path to a working responsive web and mobile-like surface. The current product scope is physical goods sourced across Indian states. The domain model is split into typed sourcing routes, catalogue, compliance, logistics, and invoice data so each can become an API-backed module without changing the product workflow.
+The repository is an npm-workspaces monorepo with three deployable/shareable units:
 
-## Production Services
+- `apps/api` — Fastify 5 + Prisma + PostgreSQL. DB-backed cookie sessions, role guards,
+  server-priced expiring quotes, orders created only from quote IDs, seller price
+  revisions with optimistic locking and audit rows, admin-only logistics directory,
+  per-IP rate limits, load shedding, `/healthz` + `/readyz`, graceful shutdown. The
+  process is stateless: any replica can serve any request.
+- `apps/web` — React + Vite PWA served by nginx in production (immutable asset caching,
+  gzip, SPA fallback, `/api` reverse proxy with Docker-DNS round-robin across API
+  replicas).
+- `packages/shared` — domain types, the versioned India corridor rule pack
+  (`RULE_PACK_VERSION`), and the pricing engine used by the API for authoritative totals
+  and by the web app for instant previews.
+
+Quotes and orders persist the rule-pack version and product price version they were
+priced under, so historical invoices stay explainable when rules or prices change. The
+current product scope is physical goods sourced across Indian states.
+
+## Service roadmap
+
+The sections below describe the fuller service decomposition this codebase is shaped to
+grow into.
+
+### Production Services
 
 1. Identity and access: buyer, supplier, operator, compliance reviewer, and finance roles with MFA for operators.
 2. Catalogue service: anonymised buyer view, private supplier view, verification state, certifications, state origin, and physical product lots.

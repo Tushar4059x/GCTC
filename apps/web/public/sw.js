@@ -22,6 +22,7 @@ self.addEventListener('fetch', (event) => {
   if (
     event.request.mode === 'navigate'
     || url.origin !== self.location.origin
+    || url.pathname.startsWith('/api/')
     || url.pathname.includes('/documents')
     || url.pathname.includes('/invoices')
   ) return

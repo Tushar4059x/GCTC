@@ -1,79 +1,114 @@
-# GCTC MVP
+# GCTC
 
-GCTC, the Global Chamber of Trade and Commerce, is a mobile-first PWA prototype for an Amazon-inspired Indian B2B product marketplace. It demonstrates buyer marketplace pages, role-based demo login, seller center, admin console, state-based product search, anonymised catalogue, product detail, trade cart, delivered-cost checkout, logistics, GST calculation, and upfront payment state.
+GCTC, the Global Chamber of Trade and Commerce, is a full-stack B2B marketplace for
+wholesale products sourced across Indian states: buyer marketplace, seller centre, and
+admin console with server-enforced roles, server-priced quotes, and persisted orders.
 
-## What Is Built
+## Architecture
 
-- Responsive React + TypeScript + Vite PWA.
-- Multi-page client routing for marketplace, product, cart, checkout, orders, seller center, admin console, account, and login.
-- Demo role switching for buyer, seller, and admin permission levels.
-- Amazon-style buyer flow: search, state and category filters, product detail, trade cart, checkout, and order tracking.
-- Seller center for inventory, fulfilment, settlement holds, and seller-side no-bypass rules.
-- Seller-owned pricing: the demo seller can update only products assigned to that account, with a required reason and local audit history.
-- Seller sales and quality report with CSV export, anonymised buyer references, fulfilment scope, tonnage, disputes, and acceptance state.
-- Two buyer scopes: GCTC sourcing with buyer-managed interstate transport, or a GCTC delivered product and logistics package.
-- Domestic trade document packs covering purchase order, GST invoice, packing list, e-way bill, inspection/test reports, insurance, and FSSAI verification.
-- Admin console for seller quality exceptions and a private logistics directory for warehouses, trucks, container trailers, movers, and local delivery tariffs.
-- Product sourcing across Maharashtra, Andhra Pradesh, Gujarat, Telangana, Rajasthan, Kerala, and Karnataka.
-- Physical food, spice, grain, dry-fruit, and coffee products with prices, specs, certifications, and benefits.
-- Supplier identity protection by design: buyer-facing data does not include supplier contact fields.
-- Dynamic invoice calculation for products, interstate transport, handling, insurance, platform margin, GST, and payment protection.
-- Compliance checklist per state sourcing route.
-- Payment state simulation for upfront payment and escrow-required corridors.
+npm-workspaces monorepo:
 
-## Demo Logins
+| Workspace | What it is |
+| --- | --- |
+| `apps/api` | Fastify 5 + Prisma + PostgreSQL API. Sessions, RBAC, quotes, orders, seller pricing, admin operations, rate limiting, health checks. Stateless — scale it horizontally. |
+| `apps/web` | React 19 + Vite PWA. All data comes from the API; the shared pricing engine renders instant previews before a server quote is locked. |
+| `packages/shared` | Domain types, the versioned India corridor rule pack, and the pricing engine — one source of truth used by both API and web. |
 
-Use `Switch login` in the top right, then choose:
+Key production behaviours:
+
+- **Server-priced money.** The client never submits totals. Checkout accepts a quote ID;
+  quotes are server-priced snapshots that expire (default 30 min) and are invalidated when
+  a seller changes the price (optimistic-lock version + audit row).
+- **Data boundaries.** Buyer catalogue responses exclude seller identity; sellers see
+  anonymised buyer references; the logistics partner directory is admin-only.
+- **Traffic management.** Per-IP rate limits (stricter on login), load shedding under
+  pressure, `/healthz` + `/readyz` probes, DB-backed sessions so any replica can serve any
+  request, graceful shutdown, nginx serving static assets with immutable caching and
+  round-robin proxying to API replicas.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), and
+[PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for the conversion checklist.
+
+## Run locally (development)
+
+Requires Node 20+ and PostgreSQL (either local, or `docker compose up -d postgres`).
+
+```bash
+npm install
+cp .env.example .env                     # adjust DATABASE_URL if needed
+npm run db:migrate -w @gctc/api          # create schema
+npm run db:seed -w @gctc/api             # demo users + catalogue
+npm run dev                              # API on :3000, web on :5173 (proxied /api)
+```
+
+`apps/api/.env` holds the API's development environment (see `.env.example`).
+
+## Demo logins
+
+All demo accounts use the password `gctc-demo`:
 
 - Buyer: `buyer@gctc.demo`
 - Seller: `seller@gctc.demo`
 - Admin: `admin@gctc.demo`
 
-The login is a frontend prototype only. Production auth should use server-side sessions, MFA for operators, role-based access control, and row-level security.
+Roles and every write are enforced by the API from the server session — switching roles
+is a real login, not a client toggle.
 
-Seller price changes are persisted in versioned browser storage for demonstration. This is intentionally not presented as a production authorization mechanism. In production, catalogue writes, price revisions, reports, invoice totals, and partner identities must be enforced and generated by authenticated server APIs.
-
-## Run Locally
+## Deploy (Docker Compose)
 
 ```bash
-npm install
-npm run dev
+cp .env.example .env    # set a strong SESSION_SECRET and POSTGRES_PASSWORD
+docker compose --profile app up -d --build
 ```
 
-## Deploy To Vercel
+- Web (nginx): http://localhost:8080 — serves the SPA, proxies `/api` to the API service.
+- Seed demo data on first boot: set `SEED_ON_BOOT=true` on the `api` service (or run
+  `docker compose exec api node apps/api/dist/seed.js`).
+- Scale the API horizontally: `docker compose --profile app up -d --scale api=3` —
+  nginx round-robins across replicas via Docker DNS; sessions live in Postgres so any
+  replica can serve any request.
+- Health probes: `GET /healthz` (liveness) and `GET /readyz` (readiness, checks the DB)
+  on the API service.
 
-This repo is configured for Vercel with `vercel.json`.
+The same images run on any container platform (Fly.io, Railway, Render, ECS, Cloud Run);
+the API container applies `prisma migrate deploy` on start. For managed hosting of the
+frontend alone, `vercel.json` builds `apps/web` — point `/api` at a hosted API via a
+Vercel rewrite in that case.
 
-- Framework preset: `Vite`
-- Install command: `npm ci`
-- Build command: `npm run build`
-- Output directory: `dist`
-- SPA deep links are rewritten to `index.html`, so routes like `/seller`, `/admin`, `/orders`, and `/checkout` work after refresh.
-- Baseline security headers are applied at the edge. Update the Content Security Policy before adding external APIs, analytics, payment providers, fonts, or image domains.
+## Tests & CI
 
-To deploy from GitHub, import `Tushar4059x/GCTC` in Vercel and keep the root directory as the repository root.
+```bash
+npm run test        # shared pricing engine + API integration tests (needs Postgres)
+npm run typecheck
+npm run lint
+npm run build
+```
 
-## Prototype Image Sources
+API integration tests use `TEST_DATABASE_URL` (default
+`postgresql://gctc:gctc@localhost:5433/gctc_test`). GitHub Actions runs lint, typecheck,
+tests against a Postgres service, workspace builds, and both Docker image builds
+([ci.yml](.github/workflows/ci.yml)).
 
-Product photos are local prototype assets under `public/product-images`, sourced from Wikimedia Commons file pages:
+## API surface
 
-- Cashews: `File:Kashuvandi-001.jpg`
-- Cocoa: `File:Cocoa Powder and Chocolate on Marble Background.jpg`
-- Sesame: `File:Sesame-Seeds.jpg`
-- Turmeric: `File:Turmeric-powder.jpg`
-- Millet: `File:Millet grains.jpg`
-- Cardamom: `File:Cardamom Large.JPG`
-- Coffee: `File:Coffee beans robusta.jpg`
+| Method & path | Access | Purpose |
+| --- | --- | --- |
+| `POST /api/auth/login` · `/logout` · `GET /api/auth/me` | public / session | Cookie sessions (httpOnly, signed) |
+| `GET /api/catalogue?query=` | public | Masked listings with server-computed delivered price |
+| `POST /api/quotes` | signed in | Expiring server-priced quote snapshot |
+| `POST /api/orders` | signed in | Checkout by quote ID; immutable invoice snapshot |
+| `GET /api/orders` | role-scoped | Buyer: own · seller: own products, buyer anonymised · admin: all |
+| `GET /api/seller/products` · `PATCH /api/seller/products/:id/price` | seller | Own listings; price change needs reason + version, writes audit, expires open quotes |
+| `GET /api/seller/sales` · `/sales.csv` · `/price-audits` | seller | Reports (CSV generated server-side, injection-safe) |
+| `GET /api/admin/logistics-partners` · `/sales-exceptions` · `/price-audits` · `/metrics` | admin | Private operations desk |
 
-## Best-Fit Production Stack
+## Prototype image sources
 
-- Frontend/PWA: Next.js or React Native Expo once native mobile distribution is required.
-- API: TypeScript service layer with tRPC or REST, deployed behind an API gateway.
-- Database: Postgres with row-level security, tenant-aware tables, encrypted fields for sensitive counterparty data.
-- Search: Postgres full-text for MVP, OpenSearch/Meilisearch once catalogue volume grows.
-- Payments: PCI-compliant provider such as Stripe/Razorpay/Adyen, with server-side signed payment intents and escrow/hold logic where supported.
-- Documents: Private object storage with short-lived signed URLs, malware scanning, audit trails, and immutable invoice snapshots.
-- Jobs/events: Queue workers for logistics quotes, compliance rules, FX refresh, invoice finalization, and reconciliation.
-- AI concierge: retrieval-backed assistant with strict tool permissions; it should call pricing/compliance APIs rather than inventing taxes or duties.
+Product photos are local assets under `apps/web/public/product-images`, sourced from
+Wikimedia Commons file pages (cashews, cocoa, sesame, turmeric, millet, cardamom, coffee).
 
-See [ARCHITECTURE.md](/Users/tushar/Documents/Startups/GCTC/ARCHITECTURE.md) and [SECURITY.md](/Users/tushar/Documents/Startups/GCTC/SECURITY.md).
+## Deliberately deferred
+
+Payment provider integration (Razorpay/Stripe), document object storage, queue workers,
+search service, multi-region. The domain model and API boundaries are shaped so these
+bolt on without restructuring — see ARCHITECTURE.md.
