@@ -24,12 +24,23 @@ export class ApiError extends Error {
   }
 }
 
+const CSRF_COOKIE = 'gctc_csrftoken'
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase()
+  const csrfToken = SAFE_METHODS.has(method) ? null : readCookie(CSRF_COOKIE)
   const response = await fetch(path, {
     credentials: 'same-origin',
     ...options,
     headers: {
       ...(options.body ? { 'content-type': 'application/json' } : {}),
+      ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
       ...options.headers,
     },
   })

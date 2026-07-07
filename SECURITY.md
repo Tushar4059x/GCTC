@@ -2,9 +2,12 @@
 
 ## Implemented Controls
 
-- Authentication is server-side: scrypt-hashed passwords, random session tokens stored
-  hashed in Postgres, delivered as signed httpOnly SameSite cookies (Secure in
-  production). Logout revokes the DB session.
+- Authentication is server-side: Django's password hasher (PBKDF2), DB-backed sessions in
+  httpOnly SameSite=Lax cookies (Secure in production). Logout revokes the session.
+- CSRF: DRF SessionAuthentication + Django's CsrfViewMiddleware enforce a double-submit
+  token. The token cookie (`gctc_csrftoken`) is issued on load and echoed in the
+  `X-CSRFToken` header on every mutating request; requests without a valid token are
+  rejected (403). SameSite=Lax is a second, independent control, not the only one.
 - Every route derives actor and tenant from the server session; role guards protect
   seller and admin surfaces. The client never supplies `seller_id` or totals.
 - All money is computed server-side: quotes are expiring server-priced snapshots, and
@@ -14,13 +17,21 @@
 - Supplier anonymity is enforced in API serialization: buyer catalogue payloads carry no
   seller identity; seller order/report views get anonymised buyer references; the
   logistics partner directory is admin-only.
-- Login attempts are rate limited per IP on a stricter bucket than the global API limit;
-  the API sheds load under event-loop pressure instead of queueing unbounded work.
+- Rate limiting is per real client IP (DRF `NUM_PROXIES` takes the trusted proxy hop, so
+  `X-Forwarded-For` cannot be spoofed to mint fresh buckets), with a stricter bucket on
+  login. Counters live in a Postgres-backed cache so limits hold cluster-wide across
+  gunicorn workers and replicas.
 - Seller CSV exports are generated server-side with spreadsheet-formula injection
   escaping.
-- Security headers (CSP, nosniff, frame denial, referrer and permissions policies) are
-  set by nginx for the web app and by helmet for the API. The service worker never caches
-  `/api` responses.
+- Security headers are set at nginx for every browser-visible response: CSP, HSTS
+  (`max-age=63072000; includeSubDomains; preload`), nosniff, frame denial, referrer and
+  permissions policies. Django adds nosniff and frame denial defensively. The service
+  worker never caches `/api` responses.
+- Deployment hygiene: PostgreSQL is bound to loopback only (never published to external
+  interfaces) and `POSTGRES_PASSWORD` is required (no default). Python dependencies are
+  installed from a pip-compile lock with pinned versions and hashes (`--require-hashes`).
+  Secrets and local env files are kept out of image layers by `.dockerignore`.
+- Order IDs carry 48 bits of randomness — not sequentially guessable or enumerable.
 - Payment capture is still simulated — no card or bank data is collected. Session
   secrets and database credentials come from the environment, never the repository.
 

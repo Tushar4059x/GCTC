@@ -92,6 +92,48 @@ GCTC/
 - [x] `docker compose --profile app up` verified through nginx with curl: seed on boot, login → quote → order (`GCTC-BB3615`), quote replay blocked (409), login rate limit (429 on 11th attempt), `/healthz` + `/readyz`, CSP/security headers
 - [x] Horizontal scale: `--scale api=3` → requests distributed across all replicas (7/13/11 of 30), DB-backed session honoured on 12/12 requests across replicas
 
+## Phase 6 — Backend migration to Django (July 2026)
+
+Replaced the Fastify/Node API with Django 5 + DRF, keeping the API surface
+byte-compatible so the web app needed zero changes. The Fastify implementation is
+preserved in git history (commit `3f72799`).
+
+- [x] Django project in `apps/api` (custom email-login user model, DB sessions in the
+  same `gctc_session` cookie, `{statusCode, error, message}` error shape preserved)
+- [x] All endpoints re-implemented 1:1 (auth, catalogue, quotes, orders, seller, admin,
+  health) with the same RBAC, optimistic locking, quote-expiry, and anonymisation rules
+- [x] Pricing engine ported to Python with exact-value parity tests pinned against the
+  TypeScript engine (7 fixture cases, bit-identical floats)
+- [x] 19 Django tests green (ported the 16 integration tests + parity suite)
+- [x] Docker image (python-slim, non-root, gunicorn, migrate + optional seed on boot),
+  compose + CI updated (Node job + Django job with Postgres service)
+- [x] Rate limiting made cluster-wide via Postgres-backed cache — verified 429 across
+  3 replicas × 4 gunicorn workers (stronger than the per-process Fastify limiter)
+- [x] Verified in the browser (login, checkout order `GCTC-426D69`, seller price audit,
+  admin console) and through nginx with curl (order `GCTC-A80DED`, quote replay 409,
+  12/12 cross-replica session checks, replica load distribution)
+
+## Phase 7 — Security audit & remediation (July 2026)
+
+Full-app audit, then fixed and re-verified each finding on the running stack.
+
+- [x] HIGH — login brute-force bypass: DRF keyed throttles on the full, spoofable
+  `X-Forwarded-For`. Set `NUM_PROXIES` (1 behind nginx, 0 direct) so it takes the trusted
+  hop. Verified: rotating `X-Forwarded-For` now blocked at attempt 11 (was 0/15), and a
+  legit login recovers after the 60s window (per-IP, not a lockout).
+- [x] MEDIUM — CSRF was disabled (relied on SameSite alone): restored DRF/Django
+  double-submit CSRF token (cookie + `X-CSRFToken`), wired the web client and tests.
+  Verified in-browser (login → quote → order → seller price PATCH) and via curl (403
+  without token, 200 with) on the prod stack; +2 CSRF tests (21 total).
+- [x] MEDIUM — Postgres exposed with weak default password: bound the published port to
+  `127.0.0.1` only and made `POSTGRES_PASSWORD` required (no default; guard verified).
+- [x] MEDIUM — missing HSTS: added `Strict-Transport-Security` at nginx on `/` and
+  `/api` (verified present).
+- [x] LOW — unpinned Python deps: pip-compile lock with pinned versions + hashes,
+  Dockerfile installs `--require-hashes`; also added `.dockerignore` (closed a
+  dev-`.env`/`.venv`-in-image leak — verified absent from the image).
+- [x] LOW — order ID entropy raised from 24 to 48 bits.
+
 ---
 
 ### Deliberately deferred (documented, not built now)

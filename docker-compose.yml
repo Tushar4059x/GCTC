@@ -6,10 +6,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-gctc}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gctc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-gctc}
+    # Bound to loopback only: reachable for local inspection, never published to
+    # the host's external interfaces. The api service reaches it over the
+    # internal compose network (postgres:5432), not this mapping.
     ports:
-      - '5433:5432'
+      - '127.0.0.1:5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -25,19 +28,22 @@ services:
     profiles: [app]
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-gctc}:${POSTGRES_PASSWORD:-gctc}@postgres:5432/${POSTGRES_DB:-gctc}?connection_limit=10
-      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gctc}:${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-gctc}
+      SECRET_KEY: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      DEBUG: 'false'
+      ALLOWED_HOSTS: localhost,127.0.0.1,api,web,${PUBLIC_HOST:-localhost}
       SEED_ON_BOOT: ${SEED_ON_BOOT:-false}
+      CACHE_BACKEND: database
       TRUST_PROXY: 'true'
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-300}
       LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-10}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/readyz']
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/readyz')"]
       interval: 10s
       timeout: 3s
       retries: 5

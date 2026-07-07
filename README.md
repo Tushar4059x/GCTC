@@ -10,9 +10,9 @@ npm-workspaces monorepo:
 
 | Workspace | What it is |
 | --- | --- |
-| `apps/api` | Fastify 5 + Prisma + PostgreSQL API. Sessions, RBAC, quotes, orders, seller pricing, admin operations, rate limiting, health checks. Stateless — scale it horizontally. |
-| `apps/web` | React 19 + Vite PWA. All data comes from the API; the shared pricing engine renders instant previews before a server quote is locked. |
-| `packages/shared` | Domain types, the versioned India corridor rule pack, and the pricing engine — one source of truth used by both API and web. |
+| `apps/api` | Django 5 + Django REST Framework + PostgreSQL API. DB-backed sessions, RBAC, quotes, orders, seller pricing, admin operations, rate limiting, health checks. Stateless — scale it horizontally (gunicorn workers × container replicas). |
+| `apps/web` | React 19 + Vite PWA. All data comes from the API; the TypeScript pricing engine renders instant previews before a server quote is locked. |
+| `packages/shared` | Domain types, the versioned India corridor rule pack, and the TypeScript pricing engine used by the web app. The API carries a Python port (`trade/pricing.py`) pinned to it by exact-value parity tests. |
 
 Key production behaviours:
 
@@ -31,14 +31,15 @@ See [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), and
 
 ## Run locally (development)
 
-Requires Node 20+ and PostgreSQL (either local, or `docker compose up -d postgres`).
+Requires Node 20+, Python 3.12+, and PostgreSQL (either local, or `docker compose up -d postgres`).
 
 ```bash
 npm install
-cp .env.example .env                     # adjust DATABASE_URL if needed
+npm run setup -w @gctc/api               # python venv + pip install
+cp .env.example apps/api/.env            # adjust DATABASE_URL if needed
 npm run db:migrate -w @gctc/api          # create schema
 npm run db:seed -w @gctc/api             # demo users + catalogue
-npm run dev                              # API on :3000, web on :5173 (proxied /api)
+npm run dev                              # Django on :3000, web on :5173 (proxied /api)
 ```
 
 `apps/api/.env` holds the API's development environment (see `.env.example`).
@@ -62,8 +63,8 @@ docker compose --profile app up -d --build
 ```
 
 - Web (nginx): http://localhost:8080 — serves the SPA, proxies `/api` to the API service.
-- Seed demo data on first boot: set `SEED_ON_BOOT=true` on the `api` service (or run
-  `docker compose exec api node apps/api/dist/seed.js`).
+- Seed demo data on first boot: set `SEED_ON_BOOT=true` in `.env` (or run
+  `docker compose exec api python manage.py seed_demo`).
 - Scale the API horizontally: `docker compose --profile app up -d --scale api=3` —
   nginx round-robins across replicas via Docker DNS; sessions live in Postgres so any
   replica can serve any request.
@@ -78,16 +79,17 @@ Vercel rewrite in that case.
 ## Tests & CI
 
 ```bash
-npm run test        # shared pricing engine + API integration tests (needs Postgres)
+npm run test        # TS pricing tests + Django API tests (needs Postgres + venv setup)
 npm run typecheck
 npm run lint
 npm run build
 ```
 
-API integration tests use `TEST_DATABASE_URL` (default
-`postgresql://gctc:gctc@localhost:5433/gctc_test`). GitHub Actions runs lint, typecheck,
-tests against a Postgres service, workspace builds, and both Docker image builds
-([ci.yml](.github/workflows/ci.yml)).
+Django tests create/destroy a `test_<db>` database automatically (the DB role needs
+`CREATEDB`). The Python pricing port is pinned to the TypeScript engine by exact-value
+parity tests — a rule-pack change that isn't mirrored in both fails the suite. GitHub
+Actions runs the Node job (lint, typecheck, shared tests, builds), the Django job against
+a Postgres service, and both Docker image builds ([ci.yml](.github/workflows/ci.yml)).
 
 ## API surface
 

@@ -4,17 +4,20 @@
 
 The repository is an npm-workspaces monorepo with three deployable/shareable units:
 
-- `apps/api` — Fastify 5 + Prisma + PostgreSQL. DB-backed cookie sessions, role guards,
-  server-priced expiring quotes, orders created only from quote IDs, seller price
-  revisions with optimistic locking and audit rows, admin-only logistics directory,
-  per-IP rate limits, load shedding, `/healthz` + `/readyz`, graceful shutdown. The
-  process is stateless: any replica can serve any request.
+- `apps/api` — Django 5 + Django REST Framework + PostgreSQL. DB-backed cookie sessions,
+  role guards, server-priced expiring quotes, orders created only from quote IDs, seller
+  price revisions with optimistic locking and audit rows, admin-only logistics directory,
+  cluster-wide per-IP rate limits (throttle counters in a Postgres-backed cache shared by
+  every gunicorn worker and replica), `/healthz` + `/readyz`. The process is stateless:
+  any replica can serve any request.
 - `apps/web` — React + Vite PWA served by nginx in production (immutable asset caching,
   gzip, SPA fallback, `/api` reverse proxy with Docker-DNS round-robin across API
   replicas).
 - `packages/shared` — domain types, the versioned India corridor rule pack
-  (`RULE_PACK_VERSION`), and the pricing engine used by the API for authoritative totals
-  and by the web app for instant previews.
+  (`RULE_PACK_VERSION`), and the TypeScript pricing engine the web app uses for instant
+  previews. The API's authoritative totals come from a Python port
+  (`apps/api/trade/pricing.py`) held to exact-value parity with the TypeScript engine by
+  tests; rule changes must land in both.
 
 Quotes and orders persist the rule-pack version and product price version they were
 priced under, so historical invoices stay explainable when rules or prices change. The

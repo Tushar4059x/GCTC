@@ -1,0 +1,24 @@
+# Build context is the repo root for both images. Keep host-only, secret, and
+# generated files out of the image layers.
+
+# Secrets & local env (never bake into an image layer)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python host artifacts
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+apps/api/requirements.in
+
+# Node / build output (images build these themselves)
+**/node_modules
+**/dist
+apps/web/dist
+
+# VCS & tooling
+.git
+.github
+**/.DS_Store
